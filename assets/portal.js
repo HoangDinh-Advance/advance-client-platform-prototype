@@ -397,6 +397,7 @@
         el.setAttribute('aria-invalid', sale.error ? 'true' : 'false');
         document.getElementById('sale-after').textContent = sale.error ? '—' : vn(sale.available - sale.amount) + ' VND';
         document.getElementById('sale-next').disabled = !!sale.error;
+        scheduleSaleQuote();
       },
       'sale-next': function () {
         var sale = rp.state.sale;
@@ -657,6 +658,47 @@
     };
     sale.error = saleAmountError(sale);
     App.openDialog({ wide: true, render: saleDialogHtml, locked: function () { return rp.state.sale && rp.state.sale.sending; } });
+    loadSaleQuote();
+  }
+
+  /* Khoản chiết khấu dự kiến ở bước 1: backend tính lại mỗi khi Giá Mua nợ đề nghị đổi, chỉ cập nhật các ô số. */
+  var saleQuoteTimer = null;
+  var saleQuoteToken = 0;
+  function saleDiscountText(sale, invoiceNo) {
+    if (sale.error) return '—';
+    if (!sale.quote || sale.quote.requestedPurchasedAmount !== sale.amount) return '…';
+    if (!invoiceNo) return vn(sale.quote.expectedDiscount);
+    var line = sale.quote.lines.find(function (l) { return l.invoiceNo === invoiceNo; });
+    return line ? vn(line.discount) : '—';
+  }
+  function paintSaleDiscount() {
+    var sale = rp.state.sale;
+    if (!sale || sale.step !== 'detail') return;
+    sale.rows.forEach(function (r) {
+      var cell = document.getElementById('sale-disc-' + r.id);
+      if (cell) cell.textContent = saleDiscountText(sale, r.number);
+    });
+    var total = document.getElementById('sale-disc-total');
+    if (total) total.textContent = saleDiscountText(sale, null);
+  }
+  function loadSaleQuote() {
+    var sale = rp.state.sale;
+    var token = ++saleQuoteToken;
+    paintSaleDiscount();
+    if (!sale || sale.error) return;
+    api.quoteSaleRequest({
+      buyerTaxCode: sale.buyer.taxCode, invoiceIds: sale.rows.map(function (r) { return r.id; }),
+      appliedRate: sale.rate, requestedPurchasedAmount: sale.amount
+    }).then(function (quote) {
+      if (token !== saleQuoteToken || rp.state.sale !== sale) return;
+      sale.quote = quote;
+      paintSaleDiscount();
+    }).catch(function () { /* số chiết khấu để trống; lỗi thật sẽ hiện khi bấm Tiếp tục */ });
+  }
+  function scheduleSaleQuote() {
+    clearTimeout(saleQuoteTimer);
+    paintSaleDiscount();
+    saleQuoteTimer = setTimeout(loadSaleQuote, 300);
   }
 
   function saleAmountError(sale) {
@@ -714,12 +756,12 @@
         <div><dt>(2) Tỷ lệ mua nợ</dt><dd>${sale.rate}%</dd></div>
       </dl>
       <div class="sale-table table-wrap" id="sale-wrap">
-        <table class="data-table" style="min-width: 680px">
-          <thead><tr><th>Số HĐ</th><th>Ngày HĐ</th><th>Ngày đến hạn dự kiến</th><th class="num">(1) Giá trị hóa đơn (chưa VAT)</th><th class="num">(2) Tỷ lệ mua nợ</th><th class="num">(3) Giá Mua nợ tối đa</th></tr></thead>
+        <table class="data-table" style="min-width: 740px">
+          <thead><tr><th>Số HĐ</th><th>Ngày HĐ</th><th>Ngày đến hạn dự kiến</th><th class="num">(1) Giá trị hóa đơn (chưa VAT)</th><th class="num">(2) Tỷ lệ mua nợ</th><th class="num">(3) Giá Mua nợ tối đa</th><th class="num">Khoản chiết khấu dự kiến (đã gồm VAT)</th></tr></thead>
           <tbody>${sale.rows.map(function (r) {
-            return html`<tr><td class="mono strong">${r.number}</td><td class="mono nowrap">${fmt.vnDate(r.issueDate)}</td><td class="mono nowrap">${r.dueDate ? fmt.vnDate(r.dueDate) : '—'}</td><td class="num">${vn(r.amountExVat)}</td><td class="num">${sale.rate}%</td><td class="num strong">${vn(r.max)}</td></tr>`;
+            return html`<tr><td class="mono strong">${r.number}</td><td class="mono nowrap">${fmt.vnDate(r.issueDate)}</td><td class="mono nowrap">${r.dueDate ? fmt.vnDate(r.dueDate) : '—'}</td><td class="num">${vn(r.amountExVat)}</td><td class="num">${sale.rate}%</td><td class="num strong">${vn(r.max)}</td><td class="num" id="sale-disc-${r.id}">${saleDiscountText(sale, r.number)}</td></tr>`;
           })}</tbody>
-          <tfoot><tr><td colspan="3">Tổng</td><td class="num">${vn(sale.sumEx)}</td><td></td><td class="num">${vn(sale.sumMax)}</td></tr></tfoot>
+          <tfoot><tr><td colspan="3">Tổng</td><td class="num">${vn(sale.sumEx)}</td><td></td><td class="num">${vn(sale.sumMax)}</td><td class="num" id="sale-disc-total">${saleDiscountText(sale, null)}</td></tr></tfoot>
         </table>
       </div>
       <div class="field amount-field">
@@ -1307,8 +1349,8 @@
         </section>
         <section class="card" aria-labelledby="if-title">
           <div class="card-head"><h2 id="if-title">Hóa đơn đầu vào</h2></div>
-          <div class="sale-tabs" role="tablist" aria-label="Trạng thái yêu cầu">
-            ${[['all', 'Tất cả'], ['unsent', 'Chưa gửi yêu cầu'], ['sent', 'Đã gửi yêu cầu']].map(function (tab) {
+          <div class="sale-tabs" role="tablist" aria-label="Trạng thái tài trợ">
+            ${[['all', 'Tất cả'], ['unsent', 'Chưa tài trợ'], ['sent', 'Đã tài trợ']].map(function (tab) {
               return html`<button type="button" role="tab" class="sale-tab" data-act="if-tab" data-tab="${tab[0]}" aria-selected="${st.tab === tab[0] ? 'true' : 'false'}">${tab[1]}<span>${counts[tab[0]]}</span></button>`;
             })}
           </div>

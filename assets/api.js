@@ -15,7 +15,7 @@
   ApiError.prototype = Object.create(Error.prototype);
 
   var LATENCY_MS = 350;
-  var SLOW = { 'POST /portal/me/rp/debit-auth': 1200, 'POST /portal/me/pf/payroll-files': 1000 };
+  var SLOW = { 'POST /portal/me/rp/debit-auth': 1200, 'POST /portal/me/pf/payroll-files': 1000, 'POST /portal/me/rp/sale-requests/quote': 150 };
 
   /* Mock transport. Bản thật: return fetch(BASE_URL + path, { method, headers, body: JSON.stringify(body) }) ... */
   function transport(method, path, body) {
