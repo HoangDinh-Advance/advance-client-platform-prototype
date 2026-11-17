@@ -401,8 +401,24 @@
       'sale-next': function () {
         var sale = rp.state.sale;
         sale.error = saleAmountError(sale);
-        if (!sale.error) sale.step = 'confirm';
+        if (sale.error) { App.paintDialog(); return; }
+        // Khoản chiết khấu dự kiến do backend tính trên Giá Mua nợ đề nghị.
+        sale.quoting = true;
+        sale.serverError = '';
         App.paintDialog();
+        api.quoteSaleRequest({
+          buyerTaxCode: sale.buyer.taxCode, invoiceIds: sale.rows.map(function (r) { return r.id; }),
+          appliedRate: sale.rate, requestedPurchasedAmount: sale.amount
+        }).then(function (quote) {
+          sale.quoting = false;
+          sale.quote = quote;
+          sale.step = 'confirm';
+          App.paintDialog();
+        }).catch(function (error) {
+          sale.quoting = false;
+          sale.serverError = SALE_ERRORS[error.code] || error.message;
+          App.paintDialog();
+        });
       },
       'sale-back': function () { rp.state.sale.step = 'detail'; rp.state.sale.serverError = ''; App.paintDialog(); },
       'sale-send': function () {
@@ -650,14 +666,6 @@
     return '';
   }
 
-  // Mỗi hóa đơn có ngày đến hạn riêng; màn xác nhận ghi một ngày hoặc khoảng sớm nhất – muộn nhất.
-  function saleDueRange(sale) {
-    var dates = sale.rows.map(function (r) { return r.dueDate; }).filter(Boolean).sort();
-    if (!dates.length) return '—';
-    var first = dates[0], last = dates[dates.length - 1];
-    return first === last ? fmt.vnDate(first) : fmt.vnDate(first) + ' – ' + fmt.vnDate(last);
-  }
-
   function saleDialogHtml() {
     var sale = rp.state.sale;
     if (!sale) return '';
@@ -673,16 +681,22 @@
       return html`<div class="modal-body">
         <div class="eyebrow">Mua bán nợ</div>
         <h2 id="dialog-title">Xác nhận yêu cầu bán nợ</h2>
-        <dl class="receipt">
+        <dl class="facts box">
           <div><dt>Bên thanh toán</dt><dd>${sale.buyer.name}</dd></div>
-          <div><dt>Hóa đơn</dt><dd>${sale.rows.map(function (r) { return r.number; }).join(', ')}</dd></div>
-          <div><dt>Ngày đến hạn dự kiến</dt><dd class="mono">${saleDueRange(sale)}</dd></div>
-          <div><dt>Tổng (1) Giá trị Khoản nợ (chưa VAT)</dt><dd class="mono">${vn(sale.sumEx)} VND</dd></div>
+          <div><dt>MST</dt><dd class="mono">${sale.buyer.taxCode}</dd></div>
           <div><dt>(2) Tỷ lệ mua nợ</dt><dd>${sale.rate}%</dd></div>
-          <div><dt>Tổng (3) Giá Mua nợ tối đa</dt><dd class="mono">${vn(sale.sumMax)} VND</dd></div>
-          <div class="receipt-total"><dt>Giá Mua nợ đề nghị</dt><dd class="mono">${vn(sale.amount)} VND</dd></div>
         </dl>
-        <p>Khoản chiết khấu và Giá Thanh toán thực tế sẽ được Advance xác nhận trong Phụ lục giao dịch sau khi duyệt.</p>
+        <div class="sale-table table-wrap" id="sale-confirm-wrap">
+          <table class="data-table" style="min-width: 700px">
+            <thead><tr><th>Số HĐ</th><th>Ngày đến hạn dự kiến</th><th class="num">(1) Giá trị hóa đơn (chưa VAT)</th><th class="num">(3) Giá Mua nợ tối đa</th><th class="num">Giá Mua nợ đề nghị</th><th class="num">Khoản chiết khấu dự kiến (đã gồm VAT)</th></tr></thead>
+            <tbody>${sale.quote.lines.map(function (line) {
+              var row = sale.rows.find(function (r) { return r.number === line.invoiceNo; });
+              return html`<tr><td class="mono strong">${line.invoiceNo}</td><td class="mono nowrap">${fmt.vnDate(line.dueDate)}</td><td class="num">${vn(row.amountExVat)}</td><td class="num">${vn(row.max)}</td><td class="num strong">${vn(line.purchasedAmount)}</td><td class="num">${vn(line.discount)}</td></tr>`;
+            })}</tbody>
+            <tfoot><tr><td colspan="2">Tổng</td><td class="num">${vn(sale.sumEx)}</td><td class="num">${vn(sale.sumMax)}</td><td class="num">${vn(sale.amount)}</td><td class="num">${vn(sale.quote.expectedDiscount)}</td></tr></tfoot>
+          </table>
+        </div>
+        <p>Khoản chiết khấu chính thức và Giá Thanh toán thực tế sẽ được Advance xác nhận trong Phụ lục giao dịch sau khi duyệt.</p>
         ${sale.serverError && html`<p class="banner banner-danger" role="alert">${sale.serverError}</p>`}
         <div class="modal-actions">
           <button type="button" class="btn btn-outline" data-act="sale-back" ${sale.sending ? App.raw('disabled') : ''}>Quay lại</button>
@@ -701,7 +715,7 @@
       </dl>
       <div class="sale-table table-wrap" id="sale-wrap">
         <table class="data-table" style="min-width: 680px">
-          <thead><tr><th>Số HĐ</th><th>Ngày HĐ</th><th>Ngày đến hạn dự kiến</th><th class="num">(1) Giá trị Khoản nợ (chưa VAT)</th><th class="num">(2) Tỷ lệ mua nợ</th><th class="num">(3) Giá Mua nợ tối đa</th></tr></thead>
+          <thead><tr><th>Số HĐ</th><th>Ngày HĐ</th><th>Ngày đến hạn dự kiến</th><th class="num">(1) Giá trị hóa đơn (chưa VAT)</th><th class="num">(2) Tỷ lệ mua nợ</th><th class="num">(3) Giá Mua nợ tối đa</th></tr></thead>
           <tbody>${sale.rows.map(function (r) {
             return html`<tr><td class="mono strong">${r.number}</td><td class="mono nowrap">${fmt.vnDate(r.issueDate)}</td><td class="mono nowrap">${r.dueDate ? fmt.vnDate(r.dueDate) : '—'}</td><td class="num">${vn(r.amountExVat)}</td><td class="num">${sale.rate}%</td><td class="num strong">${vn(r.max)}</td></tr>`;
           })}</tbody>
@@ -718,9 +732,10 @@
         <div class="after">Hạn mức Mua bán nợ còn lại sau yêu cầu này: <strong id="sale-after">${sale.error ? '—' : vn(sale.available - sale.amount) + ' VND'}</strong></div>
         <div class="note">Khoản chiết khấu và Giá Thanh toán thực tế sẽ được Advance xác nhận trong Phụ lục giao dịch sau khi duyệt.</div>
       </div>
+      ${sale.serverError && html`<p class="banner banner-danger" role="alert">${sale.serverError}</p>`}
       <div class="modal-actions">
         <button type="button" class="btn btn-outline" data-act="sale-close">Đóng</button>
-        <button type="button" class="btn btn-primary" id="sale-next" data-act="sale-next" ${sale.error ? App.raw('disabled') : ''}>Tiếp tục</button>
+        <button type="button" class="btn btn-primary" id="sale-next" data-act="sale-next" ${sale.error || sale.quoting ? App.raw('disabled') : ''}>${sale.quoting ? 'Đang tính…' : 'Tiếp tục'}</button>
       </div>
     </div>`;
   }

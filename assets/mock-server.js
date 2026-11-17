@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  var STORAGE_KEY = 'advance-client-platform-demo/v7';
+  var STORAGE_KEY = 'advance-client-platform-demo/v8';
   // Ngày "hôm nay" của bản demo được cố định để dữ liệu mẫu ở spec §2 luôn đúng (đến hạn, quá hạn).
   var DEMO_TODAY = '2026-11-12';
   // Trích nợ tự động qua EPAY: tắt từ 17/11. Đổi thành true thì mọi màn và API liên quan trở lại.
@@ -111,6 +111,8 @@
           cancelRejectReason: null, otp: null }
       ],
       invoices: [
+        // Hóa đơn đầu ra đã quá 90 ngày tính tới 12/11/2026, để thấy hóa đơn không bán được (mẫu tự đặt).
+        inv('out', '00000405', 'Công ty TNHH Sonpro', '0312345678', '2026-08-05', 545454545, 600000000, 'UNSOLD'),
         inv('out', '00000412', 'Công ty TNHH Sonpro', '0312345678', '2026-08-15', 1090909091, 1200000000, 'UNSOLD'),
         inv('out', '00000418', 'Công ty TNHH Sonpro', '0312345678', '2026-08-16', 909090909, 1000000000, 'UNSOLD'),
         inv('out', '00000425', 'Công ty TNHH Sonpro', '0312345678', '2026-08-20', 727272727, 800000000, 'UNSOLD'),
@@ -377,7 +379,7 @@
       id: request.id, submittedAt: request.submittedAt, buyerTaxCode: request.buyerTaxCode, buyerName: buyer ? buyer.name : '',
       invoiceCount: request.invoiceIds.length, invoiceIds: request.invoiceIds.slice(),
       requestedPurchasedAmount: request.requestedPurchasedAmount, appliedRate: request.appliedRate, status: request.status,
-      loanId: request.loanId || null
+      loanId: request.loanId || null, expectedDiscount: request.expectedDiscount == null ? null : request.expectedDiscount
     };
   }
 
@@ -650,29 +652,69 @@
     }) });
   });
 
-  route('POST', '/portal/me/rp/sale-requests', function (state, req) {
-    var body = req.body || {};
+  // Kiểm tra một yêu cầu bán nợ, dùng chung cho tính chiết khấu dự kiến và gửi yêu cầu.
+  function checkSale(state, body) {
     var ids = Array.isArray(body.invoiceIds) ? body.invoiceIds : [];
     var buyer = buyerBy(state, body.buyerTaxCode);
-    if (!buyer) return fail(422, 'BUYER_NOT_WHITELISTED', 'Bên thanh toán không thuộc danh sách được chấp nhận.');
+    if (!buyer) return { error: fail(422, 'BUYER_NOT_WHITELISTED', 'Bên thanh toán không thuộc danh sách được chấp nhận.') };
     var status = authStatus(state, buyer);
-    if (status === 'CANCEL_PENDING') return fail(422, 'AUTH_CANCEL_PENDING', 'Bên thanh toán đang chờ Advance duyệt hủy ủy quyền.');
+    if (status === 'CANCEL_PENDING') return { error: fail(422, 'AUTH_CANCEL_PENDING', 'Bên thanh toán đang chờ Advance duyệt hủy ủy quyền.') };
     var invoices = ids.map(function (id) { return state.invoices.find(function (i) { return i.id === id && i.direction === 'out'; }); });
-    if (!ids.length || invoices.some(function (i) { return !i; })) return fail(422, 'INVOICE_NOT_FOUND', 'Không tìm thấy hóa đơn.');
-    if (invoices.some(function (i) { return i.partyTaxCode !== buyer.taxCode; })) return fail(422, 'MULTIPLE_BUYERS', 'Mỗi yêu cầu chỉ gồm hóa đơn của một Bên thanh toán.');
-    if (invoices.some(function (i) { return i.status !== 'UNSOLD'; })) return fail(422, 'INVOICE_NOT_UNSOLD', 'Có hóa đơn đã bán hoặc đang chờ duyệt.');
-    if (invoices.some(overAge)) return fail(422, 'INVOICE_TOO_OLD', 'Có hóa đơn đã quá ' + MAX_INVOICE_AGE_DAYS + ' ngày.');
+    if (!ids.length || invoices.some(function (i) { return !i; })) return { error: fail(422, 'INVOICE_NOT_FOUND', 'Không tìm thấy hóa đơn.') };
+    if (invoices.some(function (i) { return i.partyTaxCode !== buyer.taxCode; })) return { error: fail(422, 'MULTIPLE_BUYERS', 'Mỗi yêu cầu chỉ gồm hóa đơn của một Bên thanh toán.') };
+    if (invoices.some(function (i) { return i.status !== 'UNSOLD'; })) return { error: fail(422, 'INVOICE_NOT_UNSOLD', 'Có hóa đơn đã bán hoặc đang chờ duyệt.') };
+    if (invoices.some(overAge)) return { error: fail(422, 'INVOICE_TOO_OLD', 'Có hóa đơn đã quá ' + MAX_INVOICE_AGE_DAYS + ' ngày.') };
     var rate = rateFor(status);
-    if (Number(body.appliedRate) !== rate) return fail(422, 'RATE_MISMATCH', 'Tỷ lệ mua nợ không khớp trạng thái ủy quyền.', { rate: rate });
+    if (Number(body.appliedRate) !== rate) return { error: fail(422, 'RATE_MISMATCH', 'Tỷ lệ mua nợ không khớp trạng thái ủy quyền.', { rate: rate }) };
     var maxTotal = invoices.reduce(function (sum, i) { return sum + maxPurchase(i.amountExVat, rate); }, 0);
     var amount = Number(body.requestedPurchasedAmount);
-    if (!Number.isInteger(amount) || amount <= 0) return fail(422, 'AMOUNT_INVALID', 'Giá Mua nợ đề nghị không hợp lệ.');
-    if (amount > maxTotal) return fail(422, 'AMOUNT_OVER_MAX', 'Giá Mua nợ đề nghị vượt quá tổng (3).', { max: maxTotal });
-    if (amount > available(state.limits.RP)) return fail(422, 'AMOUNT_OVER_LIMIT', 'Giá Mua nợ đề nghị vượt quá hạn mức còn lại.', { available: available(state.limits.RP) });
+    if (!Number.isInteger(amount) || amount <= 0) return { error: fail(422, 'AMOUNT_INVALID', 'Giá Mua nợ đề nghị không hợp lệ.') };
+    if (amount > maxTotal) return { error: fail(422, 'AMOUNT_OVER_MAX', 'Giá Mua nợ đề nghị vượt quá tổng (3).', { max: maxTotal }) };
+    if (amount > available(state.limits.RP)) return { error: fail(422, 'AMOUNT_OVER_LIMIT', 'Giá Mua nợ đề nghị vượt quá hạn mức còn lại.', { available: available(state.limits.RP) }) };
+    return { buyer: buyer, invoices: invoices, ids: ids, rate: rate, maxTotal: maxTotal, amount: amount };
+  }
+
+  // Khoản chiết khấu dự kiến theo RRP-SPEC §1: phân bổ Giá Mua nợ cho hóa đơn đến hạn sớm nhất trước (không quá (3)),
+  // chiết khấu chưa VAT = pur_i x mức 30 ngày chưa VAT x tenor_i / 30, VAT 10%, làm tròn nửa lên từng hóa đơn.
+  // Ngày mua nợ tạm lấy là hôm nay; số chính thức do Advance chốt trên Phụ lục giao dịch.
+  var RP_FEE_RATE_30_EX_BP = 290; // 2,90% chưa VAT (3,19% đã gồm VAT), số mẫu theo RRP-SPEC
+  function saleDiscount(sale) {
+    var todayNo = dayNumber(DEMO_TODAY);
+    var left = sale.amount;
+    var lines = sale.invoices.map(function (i) { return { inv: i, due: addDays(i.issueDate, sale.buyer.paymentTermDays) }; })
+      .sort(function (a, b) { return a.due < b.due ? -1 : a.due > b.due ? 1 : 0; })
+      .map(function (x) {
+        var purchased = Math.min(left, maxPurchase(x.inv.amountExVat, sale.rate));
+        left -= purchased;
+        var tenor = Math.max(0, dayNumber(x.due) - todayNo);
+        var exVat = Math.floor((purchased * RP_FEE_RATE_30_EX_BP * tenor + 150000) / 300000);
+        var vat = Math.floor((exVat + 5) / 10);
+        return { invoiceNo: x.inv.number, dueDate: x.due, tenorDays: tenor, purchasedAmount: purchased, discountExVat: exVat, vat: vat, discount: exVat + vat };
+      });
+    return {
+      lines: lines,
+      discountExVat: lines.reduce(function (s, l) { return s + l.discountExVat; }, 0),
+      vat: lines.reduce(function (s, l) { return s + l.vat; }, 0),
+      discount: lines.reduce(function (s, l) { return s + l.discount; }, 0)
+    };
+  }
+
+  route('POST', '/portal/me/rp/sale-requests/quote', function (state, req) {
+    var sale = checkSale(state, req.body || {});
+    if (sale.error) return sale.error;
+    var quote = saleDiscount(sale);
+    return ok({ requestedPurchasedAmount: sale.amount, expectedDiscount: quote.discount, expectedDiscountExVat: quote.discountExVat, expectedVat: quote.vat, lines: quote.lines });
+  });
+
+  route('POST', '/portal/me/rp/sale-requests', function (state, req) {
+    var sale = checkSale(state, req.body || {});
+    if (sale.error) return sale.error;
+    var buyer = sale.buyer, invoices = sale.invoices, ids = sale.ids, rate = sale.rate, maxTotal = sale.maxTotal, amount = sale.amount;
 
     var request = {
       id: nextId(state, 'sale', 'YCBN-'), buyerTaxCode: buyer.taxCode, invoiceIds: ids.slice(),
-      appliedRate: rate, requestedPurchasedAmount: amount, maxPurchasedAmount: maxTotal, submittedAt: nowStamp(), status: 'SUBMITTED'
+      appliedRate: rate, requestedPurchasedAmount: amount, maxPurchasedAmount: maxTotal, submittedAt: nowStamp(), status: 'SUBMITTED',
+      expectedDiscount: saleDiscount(sale).discount
     };
     invoices.forEach(function (i) { i.status = 'REQUESTED'; });
     state.saleRequests.unshift(request);

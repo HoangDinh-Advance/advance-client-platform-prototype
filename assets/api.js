@@ -62,6 +62,7 @@
       return transport('POST', '/portal/me/rp/debit-auth/' + enc(authId) + '/cancel-requests', reason ? { reason: reason } : {});
     },
     getInvoices: function (params) { return transport('GET', '/portal/me/invoices' + query(params)); },
+    quoteSaleRequest: function (payload) { return transport('POST', '/portal/me/rp/sale-requests/quote', payload); },
     createSaleRequest: function (payload) { return transport('POST', '/portal/me/rp/sale-requests', payload); },
     getSaleRequests: function () { return transport('GET', '/portal/me/rp/sale-requests'); },
     getIfSuppliers: function () { return transport('GET', '/portal/me/if/suppliers'); },
