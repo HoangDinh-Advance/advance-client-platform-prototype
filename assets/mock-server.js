@@ -8,6 +8,7 @@
   var STORAGE_KEY = 'advance-client-platform-demo/v4';
   // Ngày "hôm nay" của bản demo được cố định để dữ liệu mẫu ở spec §2 luôn đúng (đến hạn, quá hạn).
   var DEMO_TODAY = '2026-11-12';
+  var DEMO_EMAIL = 'ketoan.mauanphuc@gmail.com';
   // Hóa đơn (đầu ra và đầu vào) quá số ngày này kể từ ngày hóa đơn thì không chọn được.
   var MAX_INVOICE_AGE_DAYS = 90;
 
@@ -38,7 +39,8 @@
       customer: {
         name: 'Công ty TNHH Mẫu An Phúc',
         taxCode: '0100000001',
-        password: 'demo@123',
+        // Đăng nhập: email của khách hàng, mật khẩu là MST.
+        email: DEMO_EMAIL,
         agreementNo: 'ANPHUC/ADVANCE/HĐMBN-01',
         phone: '0901234567'
       },
@@ -375,8 +377,9 @@
   // ---- Cổng -> B2B
   route('POST', '/portal/auth/login', function (state, req) {
     var body = req.body || {};
-    if (String(body.taxCode || '').trim() !== state.customer.taxCode || body.password !== state.customer.password) {
-      return fail(401, 'INVALID_CREDENTIALS', 'Mã số thuế hoặc mật khẩu không đúng');
+    var email = String(body.email || '').trim().toLowerCase();
+    if (email !== (state.customer.email || DEMO_EMAIL) || String(body.password || '').trim() !== state.customer.taxCode) {
+      return fail(401, 'INVALID_CREDENTIALS', 'Email hoặc mật khẩu không đúng');
     }
     state.session.loggedIn = true;
     return ok({ name: state.customer.name, taxCode: state.customer.taxCode });

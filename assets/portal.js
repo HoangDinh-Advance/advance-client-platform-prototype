@@ -40,12 +40,12 @@
         <h1>Đăng nhập</h1>
         <form data-submit="login" novalidate autocomplete="off">
           <div class="field">
-            <label class="field-label" for="login-tax">Mã số thuế</label>
-            <input class="input" id="login-tax" data-keep="1" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="0100000001" ${st.busy ? App.raw('disabled') : ''}>
+            <label class="field-label" for="login-email">Email</label>
+            <input class="input" id="login-email" data-keep="1" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" value="ketoan.mauanphuc@gmail.com" ${st.busy ? App.raw('disabled') : ''}>
           </div>
           <div class="field">
             <label class="field-label" for="login-pass">Mật khẩu</label>
-            <input class="input" id="login-pass" data-keep="1" type="password" autocomplete="off" value="demo@123" ${st.busy ? App.raw('disabled') : ''}>
+            <input class="input" id="login-pass" data-keep="1" type="password" autocomplete="off" value="0100000001" ${st.busy ? App.raw('disabled') : ''}>
           </div>
           <p class="form-message" role="alert">${st.error}</p>
           <button type="submit" class="btn btn-primary btn-block" ${st.busy ? App.raw('disabled') : ''}>${st.busy ? 'Đang đăng nhập…' : 'Đăng nhập'}</button>
@@ -56,17 +56,17 @@
     actions: {
       login: function () {
         var view = App.views['dang-nhap'];
-        var taxCode = document.getElementById('login-tax').value;
+        var email = document.getElementById('login-email').value;
         var password = document.getElementById('login-pass').value;
         view.state.busy = true;
         view.state.error = '';
         App.paint();
-        api.login(taxCode, password).then(function (me) {
+        api.login(email, password).then(function (me) {
           App.me = me;
           App.go('tong-quan');
         }).catch(function (error) {
           view.state.busy = false;
-          view.state.error = error.code === 'INVALID_CREDENTIALS' ? 'Mã số thuế hoặc mật khẩu không đúng' : error.message;
+          view.state.error = error.code === 'INVALID_CREDENTIALS' ? 'Email hoặc mật khẩu không đúng' : error.message;
           App.paint();
         });
       }
