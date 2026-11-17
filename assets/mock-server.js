@@ -493,9 +493,10 @@
         };
         if (line.amount - line.collected > 0) {
           var dueNo = dayNumber(line.dueDate);
-          row.dpd = loan.dpd;
+          row.dpd = Math.max(0, todayNo - dueNo);
           row.amountDue = line.amount - line.collected;
-          row.dueThisWeek = dueNo >= weekStart && dueNo <= weekStart + 6;
+          // Chỉ ba loại được tô nổi: trễ hạn, đến hạn hôm nay, đến hạn trong tuần này (thứ Hai đến Chủ nhật).
+          row.dueStatus = dueNo < todayNo ? 'OVERDUE' : dueNo === todayNo ? 'TODAY' : dueNo <= weekStart + 6 ? 'THIS_WEEK' : null;
           schedule.push(row);
         } else {
           row.paidDate = line.paidAt || null;
@@ -506,11 +507,14 @@
     paid.sort(function (a, b) { return (b.paidDate || '') < (a.paidDate || '') ? -1 : 1; });
     return ok({
       today: DEMO_TODAY, limits: limits, schedule: schedule, paid: paid,
-      // Thông tin thanh toán của Advance, nội dung chuyển khoản theo tên viết tắt của khách hàng. Số tài khoản là số mẫu.
-      paymentInfo: {
-        accountName: 'CÔNG TY TNHH ADVANCE VIETNAM', bankName: 'Ngân hàng TMCP Hàng Hải Việt Nam (MSB)', accountNo: '0123456789',
-        transferContent: (state.customer.shortName || 'ANPHUC') + ' thanh toan'
-      }
+      // Thông tin thanh toán của Advance: một tài khoản nhận khoản thanh toán gốc, một tài khoản nhận phí.
+      // Nội dung chuyển khoản theo tên viết tắt của khách hàng. Số tài khoản là số mẫu.
+      paymentAccounts: [
+        { purpose: 'PRINCIPAL', accountName: 'CÔNG TY TNHH ADVANCE VIETNAM', bankName: 'Ngân hàng TMCP Hàng Hải Việt Nam (MSB)',
+          accountNo: '0123456789', transferContent: (state.customer.shortName || 'ANPHUC') + ' thanh toan' },
+        { purpose: 'FEE', accountName: 'CÔNG TY TNHH ADVANCE VIETNAM', bankName: 'Ngân hàng TNHH MTV Woori Việt Nam',
+          accountNo: '9876543210', transferContent: (state.customer.shortName || 'ANPHUC') + ' thanh toan phi' }
+      ]
     });
   });
 

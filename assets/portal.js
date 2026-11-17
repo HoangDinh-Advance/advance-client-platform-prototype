@@ -231,26 +231,23 @@
           <tbody>${paidRows.length ? paidRows : html`<tr><td colspan="7" class="empty-rows">Chưa có khoản nào đã thanh toán.</td></tr>`}</tbody>
         </table>`;
       } else {
-        var groups = {};
-        d.schedule.forEach(function (row) { (groups[row.dueDate] = groups[row.dueDate] || []).push(row); });
-        var bodies = Object.keys(groups).sort().map(function (date) {
-          var rows = groups[date];
-          var total = rows.reduce(function (sum, r) { return sum + r.amountDue; }, 0);
-          return html`<tbody>
-            <tr class="group-head"><td colspan="8">Đến hạn ${fmt.vnWeekday(date)}, ${fmt.vnDate(date)}${date === d.today ? ' (hôm nay)' : ''} · ${rows.length} khoản · ${vn(total)} VND</td></tr>
-            ${rows.map(function (r) {
-              return html`<tr class="${r.dueThisWeek ? 'is-due-week' : ''}">
-                <td class="mono strong nowrap">${r.loanId}</td>
-                <td><span class="tag tag-product">${PRODUCT[r.product]}</span></td>
-                <td>${party(r)}</td>
-                <td class="mono nowrap">${fmt.vnDate(r.dueDate)}${r.dueThisWeek && html` <span class="tag tag-warn">Trong tuần</span>`}</td>
-                <td class="num ${r.dpd > 0 ? 'overdue' : ''}">${r.dpd}</td>
-                <td class="num">${vn(r.financedAmount)}</td>
-                <td class="num">${vn(r.paidAmount)}</td>
-                <td class="num strong">${vn(r.amountDue)}</td>
-              </tr>`;
-            })}
-          </tbody>`;
+        var DUE = {
+          OVERDUE: { cls: 'is-overdue', tag: 'tag-danger', label: 'Trễ hạn' },
+          TODAY: { cls: 'is-due-today', tag: 'tag-warn', label: 'Đến hạn hôm nay' },
+          THIS_WEEK: { cls: 'is-due-week', tag: '', label: 'Trong tuần' }
+        };
+        var dueRows = d.schedule.slice().sort(function (a, b) { return a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0; }).map(function (r) {
+          var due = DUE[r.dueStatus];
+          return html`<tr class="${due ? due.cls : ''}">
+            <td class="mono strong nowrap">${r.loanId}</td>
+            <td><span class="tag tag-product">${PRODUCT[r.product]}</span></td>
+            <td>${party(r)}</td>
+            <td class="mono nowrap">${fmt.vnDate(r.dueDate)}${due && html` <span class="tag ${due.tag}">${due.label}</span>`}</td>
+            <td class="num ${r.dpd > 0 ? 'overdue' : ''}">${r.dpd}</td>
+            <td class="num">${vn(r.financedAmount)}</td>
+            <td class="num">${vn(r.paidAmount)}</td>
+            <td class="num strong">${vn(r.amountDue)}</td>
+          </tr>`;
         });
         table = html`<table class="data-table wrap-head" style="min-width: 820px">
           <thead><tr>
@@ -258,11 +255,11 @@
             <th>Ngày đến hạn</th><th class="num">Số ngày quá hạn</th>
             <th class="num">Số tiền tài trợ (VND)</th><th class="num">Số tiền đã trả (VND)</th><th class="num">Số tiền đến hạn còn lại (VND)</th>
           </tr></thead>
-          ${bodies.length ? bodies : html`<tbody><tr><td colspan="8" class="empty-rows">Không có khoản nào đến hạn.</td></tr></tbody>`}
+          <tbody>${dueRows.length ? dueRows : html`<tr><td colspan="8" class="empty-rows">Không có khoản nào đến hạn.</td></tr>`}</tbody>
         </table>`;
       }
 
-      var pay = d.paymentInfo;
+      var PAY_TITLE = { PRINCIPAL: 'Khoản thanh toán gốc', FEE: 'Phí dịch vụ' };
       return html`<div class="page-head"><h1>Tổng quan</h1></div>
         <section class="limit-grid" aria-label="Hạn mức theo sản phẩm">${cards}</section>
         <section class="card" aria-label="Lịch thanh toán">
@@ -274,12 +271,19 @@
         </section>
         <section class="card card-pad" aria-labelledby="payinfo-title">
           <h2 class="card-title" id="payinfo-title">Thông tin thanh toán</h2>
-          <dl class="facts">
-            <div><dt>Tên tài khoản</dt><dd>${pay.accountName}</dd></div>
-            <div><dt>Ngân hàng</dt><dd>${pay.bankName}</dd></div>
-            <div><dt>Số tài khoản</dt><dd class="mono">${pay.accountNo}</dd></div>
-            <div><dt>Nội dung chuyển khoản</dt><dd class="mono">${pay.transferContent}</dd></div>
-          </dl>
+          <div class="pay-grid">
+            ${d.paymentAccounts.map(function (pay) {
+              return html`<div class="box">
+                <div class="box-title">${PAY_TITLE[pay.purpose]}</div>
+                <dl class="facts">
+                  <div><dt>Tên tài khoản</dt><dd>${pay.accountName}</dd></div>
+                  <div><dt>Ngân hàng</dt><dd>${pay.bankName}</dd></div>
+                  <div><dt>Số tài khoản</dt><dd class="mono">${pay.accountNo}</dd></div>
+                  <div><dt>Nội dung chuyển khoản</dt><dd class="mono">${pay.transferContent}</dd></div>
+                </dl>
+              </div>`;
+            })}
+          </div>
         </section>`;
     }
   };

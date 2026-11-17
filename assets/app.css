@@ -379,7 +379,13 @@ textarea.input { height: auto; min-height: 76px; resize: vertical; line-height: 
 .login-links { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1rem; }
 
 /* Tổng quan: khoản đến hạn trong tuần, thông tin thanh toán */
-.data-table tr.is-due-week td { background: #fff8e8; }
-.data-table tr.is-due-week td:first-child { box-shadow: inset 3px 0 0 #e0a23a; }
+.data-table tr.is-due-week td { background: #fffaf0; }
+.data-table tr.is-due-week td:first-child { box-shadow: inset 3px 0 0 #ecc977; }
+.data-table tr.is-due-today td { background: #fff1d2; }
+.data-table tr.is-due-today td:first-child { box-shadow: inset 3px 0 0 #d98a00; }
+.data-table tr.is-overdue td { background: #fdeeee; }
+.data-table tr.is-overdue td:first-child { box-shadow: inset 3px 0 0 #c94a4a; }
+.pay-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.pay-grid .facts { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .card-title { font-size: 15px; font-weight: 600; margin-bottom: 0.9rem; }
 .data-table.wrap-head th { white-space: normal; vertical-align: bottom; }
