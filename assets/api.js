@@ -43,7 +43,9 @@
     ApiError: ApiError,
 
     /* ---------- Cổng -> B2B ---------- */
-    login: function (email, password) { return transport('POST', '/portal/auth/login', { email: email, password: password }); },
+    login: function (email, taxCode) { return transport('POST', '/portal/auth/login', { email: email, taxCode: taxCode }); },
+    confirmLoginOtp: function (otp) { return transport('POST', '/portal/auth/login/otp', { otp: otp }); },
+    resendLoginOtp: function () { return transport('POST', '/portal/auth/login/otp/resend'); },
     logout: function () { return transport('POST', '/portal/auth/logout'); },
     getMe: function () { return transport('GET', '/portal/me'); },
     getOverview: function () { return transport('GET', '/portal/me/overview'); },

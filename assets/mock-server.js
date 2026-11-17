@@ -57,7 +57,7 @@
       customer: {
         name: 'Công ty TNHH Mẫu An Phúc',
         taxCode: '0100000001',
-        // Đăng nhập: email của khách hàng, mật khẩu là MST.
+        // Đăng nhập: email của khách hàng + MST, xác thực bằng OTP gửi tới email này.
         email: DEMO_EMAIL,
         agreementNo: 'ANPHUC/ADVANCE/HĐMBN-01',
         phone: '0901234567'
@@ -395,14 +395,58 @@
   }
 
   // ---- Cổng -> B2B
+  // Đăng nhập: email + MST, rồi xác thực mã OTP gửi tới email đó. Bản demo không gửi email thật.
+  var LOGIN_OTP_LENGTH = 6;
+  function maskEmail(email) {
+    var at = email.indexOf('@');
+    return email.slice(0, Math.min(2, at)) + '***' + email.slice(at);
+  }
+  function loginOtpView(state) {
+    var otp = state.session.loginOtp;
+    return {
+      length: otp.length, triesLeft: otp.triesLeft, sendsLeft: OTP_MAX_SENDS - otp.sends,
+      expiresInSeconds: Math.max(0, Math.ceil((otp.expiresAt - nowMs()) / 1000)),
+      emailMasked: maskEmail(state.customer.email || DEMO_EMAIL)
+    };
+  }
+
   route('POST', '/portal/auth/login', function (state, req) {
     var body = req.body || {};
     var email = String(body.email || '').trim().toLowerCase();
-    if (email !== (state.customer.email || DEMO_EMAIL) || String(body.password || '').trim() !== state.customer.taxCode) {
-      return fail(401, 'INVALID_CREDENTIALS', 'Email hoặc mật khẩu không đúng');
+    if (email !== (state.customer.email || DEMO_EMAIL) || digits(body.taxCode) !== state.customer.taxCode) {
+      return fail(401, 'INVALID_CREDENTIALS', 'Email hoặc mã số thuế không đúng');
     }
+    state.session.loggedIn = false;
+    state.session.loginOtp = { length: LOGIN_OTP_LENGTH, triesLeft: OTP_TRIES, sends: 1, expiresAt: nowMs() + state.demo.otpSeconds * 1000 };
+    return ok({ status: 'OTP_REQUIRED', otp: loginOtpView(state) });
+  }, { pub: true });
+
+  route('POST', '/portal/auth/login/otp', function (state, req) {
+    var pending = state.session.loginOtp;
+    if (!pending) return fail(404, 'LOGIN_NOT_STARTED', 'Chưa có lượt đăng nhập đang chờ OTP.');
+    if (pending.expiresAt <= nowMs()) return fail(422, 'OTP_EXPIRED', 'Mã OTP đã hết hạn.');
+    var otp = digits((req.body || {}).otp);
+    if (otp.length !== pending.length || /^0+$/.test(otp)) {
+      pending.triesLeft -= 1;
+      if (pending.triesLeft <= 0) {
+        state.session.loginOtp = null;
+        return fail(422, 'OTP_LOCKED', 'Nhập sai OTP quá số lần cho phép.');
+      }
+      return fail(422, 'OTP_INVALID', 'Mã OTP không đúng.', { triesLeft: pending.triesLeft });
+    }
+    state.session.loginOtp = null;
     state.session.loggedIn = true;
     return ok({ name: state.customer.name, taxCode: state.customer.taxCode });
+  }, { pub: true });
+
+  route('POST', '/portal/auth/login/otp/resend', function (state) {
+    var pending = state.session.loginOtp;
+    if (!pending) return fail(404, 'LOGIN_NOT_STARTED', 'Chưa có lượt đăng nhập đang chờ OTP.');
+    if (pending.sends >= OTP_MAX_SENDS) return fail(422, 'OTP_SEND_LIMIT', 'Đã quá số lần gửi OTP.');
+    pending.sends += 1;
+    pending.triesLeft = OTP_TRIES;
+    pending.expiresAt = nowMs() + state.demo.otpSeconds * 1000;
+    return ok({ status: 'OTP_REQUIRED', otp: loginOtpView(state) });
   }, { pub: true });
 
   route('POST', '/portal/auth/logout', function (state) {

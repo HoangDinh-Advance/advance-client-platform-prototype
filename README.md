@@ -11,7 +11,7 @@ Trang tĩnh thuần HTML/CSS/JS, không cần build.
 - Trên máy: `python3 -m http.server 8791` trong thư mục này, rồi mở `http://127.0.0.1:8791/`.
 - GitHub Pages: đẩy nguyên thư mục lên nhánh `main` của một repo, bật Pages ở thư mục gốc (đã có `.nojekyll`).
 
-Đăng nhập bằng email của khách hàng `ketoan.mauanphuc@gmail.com`, mật khẩu là MST `0100000001` (điền sẵn).
+Đăng nhập bằng email của khách hàng `ketoan.mauanphuc@gmail.com` và MST `0100000001` (điền sẵn), rồi xác thực mã OTP gửi tới email đó. Bản demo không gửi email thật: mã OTP điền sẵn `123456`, nhập đủ 6 số bất kỳ là đúng, toàn số 0 là sai.
 
 | Phần | Địa chỉ |
 |---|---|

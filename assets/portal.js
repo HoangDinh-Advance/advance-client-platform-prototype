@@ -30,12 +30,69 @@
   function accountText(account) { return account ? account.bankName + ' · ' + account.accountNo : '(chưa có)'; }
 
   /* ================================================================== S1. Đăng nhập */
-  App.views['dang-nhap'] = {
+  // Bước 1: email + MST. Bước 2: mã OTP gửi tới email đó (bản demo điền sẵn 123456, không gửi email thật).
+  var loginTimer = null;
+  function stopLoginTimer() { if (loginTimer) { clearInterval(loginTimer); loginTimer = null; } }
+  function loginRemaining(otp) { return Math.max(0, Math.ceil((otp.deadline - Date.now()) / 1000)); }
+  function loginClock(remaining) { return String(Math.floor(remaining / 60)).padStart(2, '0') + ':' + String(remaining % 60).padStart(2, '0'); }
+  function setLoginOtp(view, result, info) {
+    view.state.step = 'otp';
+    view.state.busy = false;
+    view.state.error = '';
+    view.state.otp = {
+      length: result.otp.length, triesLeft: result.otp.triesLeft, emailMasked: result.otp.emailMasked,
+      deadline: Date.now() + result.otp.expiresInSeconds * 1000, info: info || ''
+    };
+  }
+
+  var login = App.views['dang-nhap'] = {
     mode: 'login',
-    state: { error: '', busy: false },
-    enter: function () { this.state = { error: '', busy: false }; },
+    state: { step: 'form', error: '', busy: false, otp: null },
+    enter: function () { stopLoginTimer(); this.state = { step: 'form', error: '', busy: false, otp: null }; },
+    leave: function () { stopLoginTimer(); },
+    afterPaint: function () {
+      var st = this.state;
+      if (st.step !== 'otp' || !st.otp) { stopLoginTimer(); return; }
+      if (loginTimer) return;
+      loginTimer = setInterval(function () {
+        if (App.view !== login || login.state.step !== 'otp' || !login.state.otp) { stopLoginTimer(); return; }
+        var remaining = loginRemaining(login.state.otp);
+        var count = document.getElementById('login-otp-count');
+        if (count) count.textContent = loginClock(remaining);
+        var expiredNow = remaining === 0;
+        var running = document.getElementById('login-otp-running');
+        if (running && running.hidden !== expiredNow) App.paint();
+      }, 500);
+    },
     render: function () {
       var st = this.state;
+      if (st.step === 'otp') {
+        var otp = st.otp;
+        var remaining = loginRemaining(otp);
+        var expired = remaining === 0;
+        return html`<div class="card login-card">
+          <h1>Xác thực OTP</h1>
+          <form data-submit="login-otp" novalidate autocomplete="off">
+            <p class="login-lead">Mã OTP gồm ${otp.length} số đã được gửi tới email ${otp.emailMasked}.</p>
+            <div class="field">
+              <label class="field-label" for="login-otp">Mã OTP</label>
+              <input class="input input-otp" id="login-otp" data-keep="otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="${otp.length}" value="123456" ${st.busy ? App.raw('disabled') : ''}>
+            </div>
+            <div class="otp-meta login-otp-meta">
+              <span id="login-otp-running" ${expired ? App.raw('hidden') : ''}>Mã hết hạn sau <strong id="login-otp-count">${loginClock(remaining)}</strong></span>
+              <span class="expired" ${expired ? '' : App.raw('hidden')}>Mã OTP đã hết hạn.</span>
+              <span>Còn <strong>${otp.triesLeft}</strong> lần nhập</span>
+            </div>
+            <p class="form-message" role="alert">${st.error}</p>
+            <p class="form-info" role="status">${otp.info}</p>
+            <button type="submit" class="btn btn-primary btn-block" ${st.busy || expired ? App.raw('disabled') : ''}>${st.busy ? 'Đang xác thực…' : 'Xác nhận'}</button>
+          </form>
+          <div class="login-links">
+            <button type="button" class="text-button" data-act="login-resend" ${st.busy ? App.raw('disabled') : ''}>Gửi lại mã</button>
+            <button type="button" class="text-button" data-act="login-back" ${st.busy ? App.raw('disabled') : ''}>Quay lại</button>
+          </div>
+        </div>`;
+      }
       return html`<div class="card login-card">
         <h1>Đăng nhập</h1>
         <form data-submit="login" novalidate autocomplete="off">
@@ -44,32 +101,81 @@
             <input class="input" id="login-email" data-keep="1" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" value="ketoan.mauanphuc@gmail.com" ${st.busy ? App.raw('disabled') : ''}>
           </div>
           <div class="field">
-            <label class="field-label" for="login-pass">Mật khẩu</label>
-            <input class="input" id="login-pass" data-keep="1" type="password" autocomplete="off" value="0100000001" ${st.busy ? App.raw('disabled') : ''}>
+            <label class="field-label" for="login-tax">Mã số thuế</label>
+            <input class="input" id="login-tax" data-keep="1" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="0100000001" ${st.busy ? App.raw('disabled') : ''}>
           </div>
           <p class="form-message" role="alert">${st.error}</p>
-          <button type="submit" class="btn btn-primary btn-block" ${st.busy ? App.raw('disabled') : ''}>${st.busy ? 'Đang đăng nhập…' : 'Đăng nhập'}</button>
+          <button type="submit" class="btn btn-primary btn-block" ${st.busy ? App.raw('disabled') : ''}>${st.busy ? 'Đang gửi mã OTP…' : 'Tiếp tục'}</button>
         </form>
-        <p class="login-help">Liên hệ Advance để được cấp lại mật khẩu</p>
       </div>`;
     },
     actions: {
       login: function () {
-        var view = App.views['dang-nhap'];
         var email = document.getElementById('login-email').value;
-        var password = document.getElementById('login-pass').value;
-        view.state.busy = true;
-        view.state.error = '';
+        var taxCode = document.getElementById('login-tax').value;
+        login.state.busy = true;
+        login.state.error = '';
         App.paint();
-        api.login(email, password).then(function (me) {
+        api.login(email, taxCode).then(function (result) {
+          setLoginOtp(login, result, '');
+          App.paint();
+          var el = document.getElementById('login-otp');
+          if (el) el.focus();
+        }).catch(function (error) {
+          login.state.busy = false;
+          login.state.error = error.code === 'INVALID_CREDENTIALS' ? 'Email hoặc mã số thuế không đúng' : error.message;
+          App.paint();
+        });
+      },
+      'login-otp': function () {
+        var st = login.state;
+        var code = fmt.digits(document.getElementById('login-otp').value);
+        if (code.length !== st.otp.length) {
+          st.error = 'Vui lòng nhập đủ ' + st.otp.length + ' số của mã OTP.';
+          st.otp.info = '';
+          App.paint();
+          return;
+        }
+        st.busy = true;
+        st.error = '';
+        st.otp.info = '';
+        App.paint();
+        api.confirmLoginOtp(code).then(function (me) {
+          stopLoginTimer();
           App.me = me;
           App.go('tong-quan');
         }).catch(function (error) {
-          view.state.busy = false;
-          view.state.error = error.code === 'INVALID_CREDENTIALS' ? 'Email hoặc mật khẩu không đúng' : error.message;
+          st.busy = false;
+          if (error.code === 'OTP_INVALID') {
+            st.otp.triesLeft = error.data.triesLeft;
+            st.error = 'Mã OTP không đúng.';
+          } else if (error.code === 'OTP_EXPIRED') {
+            st.error = 'Mã OTP đã hết hạn. Vui lòng bấm Gửi lại mã.';
+          } else if (error.code === 'OTP_LOCKED' || error.code === 'LOGIN_NOT_STARTED') {
+            stopLoginTimer();
+            login.state = { step: 'form', busy: false, otp: null,
+              error: error.code === 'OTP_LOCKED' ? 'Nhập sai OTP quá 3 lần. Vui lòng đăng nhập lại.' : 'Vui lòng đăng nhập lại.' };
+          } else {
+            st.error = error.message;
+          }
           App.paint();
         });
-      }
+      },
+      'login-resend': function () {
+        var st = login.state;
+        st.busy = true;
+        st.error = '';
+        App.paint();
+        api.resendLoginOtp().then(function (result) {
+          setLoginOtp(login, result, 'Đã gửi lại mã OTP.');
+          App.paint();
+        }).catch(function (error) {
+          st.busy = false;
+          st.error = error.code === 'OTP_SEND_LIMIT' ? 'Đã quá số lần gửi OTP (tối đa 5 lần).' : error.message;
+          App.paint();
+        });
+      },
+      'login-back': function () { stopLoginTimer(); login.state = { step: 'form', error: '', busy: false, otp: null }; App.paint(); }
     }
   };
 
