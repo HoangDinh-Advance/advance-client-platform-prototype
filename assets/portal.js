@@ -8,7 +8,7 @@
   var fmt = App.fmt;
   var vn = fmt.vn;
 
-  var PRODUCT = { PF: 'Payroll Financing', IF: 'Invoice Financing', RP: 'Mua bán nợ' };
+  var PRODUCT = { PF: 'Tài trợ lương', IF: 'Tài trợ hóa đơn', RP: 'Mua bán nợ' };
   var INVOICE_STATUS = {
     UNSOLD: { label: 'Chưa bán', cls: '' },
     REQUESTED: { label: 'Đang chờ duyệt', cls: 'tag-warn' },
@@ -420,7 +420,7 @@
         <section class="card choice" aria-labelledby="choice-register">
           <h2 id="choice-register">Đăng ký trích nợ tự động</h2>
           <div class="rate">Tỷ lệ mua nợ <strong>90%</strong> cho Bên thanh toán đã đăng ký.</div>
-          <p>Advance được trích Transaction account của Bên thanh toán đó khi đến hạn.</p>
+          <p>Advance được trích Tài khoản Giao dịch của Bên thanh toán đó khi đến hạn.</p>
           <button type="button" class="btn btn-primary" data-act="rp-choose-register">Đăng ký ngay</button>
         </section>
         <section class="card choice choice-plain" aria-labelledby="choice-skip">
@@ -439,7 +439,7 @@
       } else if (b.authStatus === 'ACTIVE') {
         action = html`<button type="button" class="btn btn-danger-outline btn-sm" data-act="rp-cancel-auth" data-buyer="${b.taxCode}">Hủy ủy quyền</button>`;
       } else if (b.authStatus === 'NOT_ELIGIBLE') {
-        action = html`<span class="secondary" style="font-size: 12px">Transaction account chưa mở</span>`;
+        action = html`<span class="secondary" style="font-size: 12px">Tài khoản Giao dịch chưa mở</span>`;
       } else if (b.authStatus === 'CANCEL_PENDING') {
         action = html`<span style="color: var(--warn)">Chờ Advance duyệt hủy</span>`;
       }
@@ -456,7 +456,7 @@
       <div class="card-head"><h2 id="whitelist-title">Danh sách Bên thanh toán được chấp nhận</h2></div>
       <div class="table-wrap" id="whitelist-wrap">
         <table class="data-table" style="min-width: 820px">
-          <thead><tr><th>Bên thanh toán</th><th>MST</th><th>Transaction account</th><th>Ủy quyền trích nợ</th><th class="num">(2) Tỷ lệ mua nợ</th><th>Thao tác</th></tr></thead>
+          <thead><tr><th>Bên thanh toán</th><th>MST</th><th>Tài khoản Giao dịch</th><th>Ủy quyền trích nợ</th><th class="num">(2) Tỷ lệ mua nợ</th><th>Thao tác</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -667,8 +667,8 @@
   var REG_B2B_ERRORS = {
     buyerTaxCode: 'Bên thanh toán này chưa đăng ký được ủy quyền trích nợ.',
     agreementNo: 'Mã hợp đồng không khớp với hợp đồng mua bán nợ của Quý khách tại Advance.',
-    bankCode: 'Ngân hàng không phải ngân hàng của Transaction account của Bên thanh toán đã chọn.',
-    accountNo: 'Số tài khoản không phải Transaction account của Bên thanh toán đã chọn.',
+    bankCode: 'Ngân hàng không phải ngân hàng của Tài khoản Giao dịch của Bên thanh toán đã chọn.',
+    accountNo: 'Số tài khoản không phải Tài khoản Giao dịch của Bên thanh toán đã chọn.',
     phone: 'Số điện thoại không khớp với số điện thoại Quý khách đã đăng ký với Advance.'
   };
   var REG_EPAY_ERRORS = {
@@ -1081,7 +1081,7 @@
       </div>
       <dl class="facts box">
         <div><dt>Bên thanh toán</dt><dd>${b.name}</dd></div>
-        <div><dt>Transaction account</dt><dd class="mono">${accountText(b.transactionAccount)}</dd></div>
+        <div><dt>Tài khoản Giao dịch</dt><dd class="mono">${accountText(b.transactionAccount)}</dd></div>
         <div><dt>Ủy quyền trích nợ</dt><dd>${App.authTag(b.authStatus)}</dd></div>
         <div><dt>(2) Tỷ lệ mua nợ</dt><dd>${b.rate}%</dd></div>
       </dl>
@@ -1162,7 +1162,7 @@
     }
   };
 
-  /* ================================================================== S4. Invoice Financing (sơ bộ) */
+  /* ================================================================== S4. Tài trợ hóa đơn (sơ bộ) */
   function freshIf() { return { q: '', from: DEFAULT_FROM, to: '', selected: {}, confirm: null }; }
   var IF_STATUS = { NEW: { label: 'Hóa đơn mới', cls: '' }, REQUESTED: { label: 'Đã gửi yêu cầu', cls: 'tag-warn' } };
 
@@ -1188,7 +1188,7 @@
     render: function () {
       var d = this.data;
       var st = this.state;
-      if (!d) return html`<div class="page-head"><h1>Invoice Financing</h1></div>${loadingCard()}`;
+      if (!d) return html`<div class="page-head"><h1>Tài trợ hóa đơn</h1></div>${loadingCard()}`;
       var q = st.q.trim().toLowerCase();
       var items = d.invoices.filter(function (i) {
         return !q || i.number.toLowerCase().indexOf(q) >= 0 || i.partyName.toLowerCase().indexOf(q) >= 0 || i.partyTaxCode.indexOf(q) >= 0;
@@ -1210,7 +1210,7 @@
           <td><span class="tag ${status.cls}">${status.label}</span></td>
         </tr>`;
       });
-      return html`<div class="page-head"><h1>Invoice Financing</h1></div>
+      return html`<div class="page-head"><h1>Tài trợ hóa đơn</h1></div>
         <section class="card" aria-labelledby="if-suppliers-title">
           <div class="card-head"><h2 id="if-suppliers-title">Danh sách Nhà cung cấp được chấp thuận</h2></div>
           <div class="table-wrap" id="if-suppliers-wrap">
@@ -1353,7 +1353,7 @@
       </div>`;
     }
     return html`<div class="modal-body">
-      <div class="eyebrow">Invoice Financing</div>
+      <div class="eyebrow">Tài trợ hóa đơn</div>
       <h2 id="dialog-title">Xác nhận yêu cầu tài trợ</h2>
       <dl class="receipt">
         ${c.items.map(function (i) { return html`<div><dt>${i.number} · ${i.partyName}</dt><dd class="mono nowrap">${vn(i.amountIncVat)} VND</dd></div>`; })}
@@ -1369,7 +1369,7 @@
         <div><dt>Mức phí (đã gồm VAT 10%)</dt><dd class="mono">${ifRateText(ifPackage(c).feeRateBp)}</dd></div>
         <div class="receipt-total"><dt>Phí dịch vụ dự kiến (VND, đã bao gồm VAT)</dt><dd class="mono nowrap">${vn(ifFee(c.total, ifPackage(c).feeRateBp))} VND</dd></div>
       </dl>
-      <p>Hạn mức Invoice Financing còn lại: <strong class="mono">${vn(c.available)} VND</strong></p>
+      <p>Hạn mức Tài trợ hóa đơn còn lại: <strong class="mono">${vn(c.available)} VND</strong></p>
       ${c.error && html`<p class="banner banner-danger" role="alert">${c.error}</p>`}
       <div class="modal-actions">
         <button type="button" class="btn btn-outline" data-act="if-close" ${c.sending ? App.raw('disabled') : ''}>Quay lại</button>
@@ -1378,10 +1378,10 @@
     </div>`;
   }
 
-  /* ================================================================== Payroll Financing: tạo yêu cầu chi lương */
+  /* ================================================================== Tài trợ lương: tạo yêu cầu chi lương */
   var PF_ERRORS = {
     FILE_TYPE_INVALID: 'Bảng lương phải là tệp .xlsx, .xls hoặc .csv.',
-    AMOUNT_OVER_LIMIT: 'Tổng số tiền chi lương vượt quá hạn mức Payroll Financing còn lại.',
+    AMOUNT_OVER_LIMIT: 'Tổng số tiền chi lương vượt quá hạn mức Tài trợ lương còn lại.',
     PAYROLL_FILE_ALREADY_USED: 'Bảng lương này đã được gửi. Vui lòng đóng cửa sổ và tạo yêu cầu mới.'
   };
 
@@ -1397,7 +1397,7 @@
     },
     render: function () {
       var d = this.data;
-      if (!d) return html`<div class="page-head"><h1>Payroll Financing</h1></div>${loadingCard()}`;
+      if (!d) return html`<div class="page-head"><h1>Tài trợ lương</h1></div>${loadingCard()}`;
       var rows = d.requests.map(function (r) {
         var status = SALE_REQUEST_STATUS[r.status];
         return html`<tr>
@@ -1411,7 +1411,7 @@
           <td><span class="tag ${status.cls}">${status.label}</span></td>
         </tr>`;
       });
-      return html`<div class="page-head"><h1>Payroll Financing</h1>
+      return html`<div class="page-head"><h1>Tài trợ lương</h1>
           <button type="button" class="btn btn-primary" data-act="pf-open">Tạo yêu cầu chi lương</button></div>
         <section class="card" aria-labelledby="pf-history-title">
           <div class="card-head"><h2 id="pf-history-title">Lịch sử yêu cầu</h2></div>
@@ -1496,7 +1496,7 @@
     if (f.step === 'confirm') {
       var pack = ifPackage(f);
       return html`<div class="modal-body">
-        <div class="eyebrow">Payroll Financing</div>
+        <div class="eyebrow">Tài trợ lương</div>
         <h2 id="dialog-title">Xác nhận yêu cầu chi lương</h2>
         <dl class="receipt">
           <div><dt>Bảng lương</dt><dd>${f.file.fileName}</dd></div>
@@ -1513,7 +1513,7 @@
           <div><dt>Mức phí (đã gồm VAT 10%)</dt><dd class="mono">${ifRateText(pack.feeRateBp)}</dd></div>
           <div class="receipt-total"><dt>Phí dịch vụ dự kiến (VND, đã bao gồm VAT)</dt><dd class="mono nowrap">${vn(ifFee(f.file.totalAmount, pack.feeRateBp))} VND</dd></div>
         </dl>
-        <p>Hạn mức Payroll Financing còn lại: <strong class="mono">${vn(f.available)} VND</strong></p>
+        <p>Hạn mức Tài trợ lương còn lại: <strong class="mono">${vn(f.available)} VND</strong></p>
         ${f.error && html`<p class="banner banner-danger" role="alert">${f.error}</p>`}
         <div class="modal-actions">
           <button type="button" class="btn btn-outline" data-act="pf-back" ${f.sending ? App.raw('disabled') : ''}>Quay lại</button>
@@ -1522,7 +1522,7 @@
       </div>`;
     }
     return html`<div class="modal-body">
-      <div class="eyebrow">Payroll Financing</div>
+      <div class="eyebrow">Tài trợ lương</div>
       <h2 id="dialog-title">Tạo yêu cầu chi lương</h2>
       ${f.file ? html`<dl class="facts box">
           <div><dt>Bảng lương</dt><dd>${f.file.fileName}</dd></div>

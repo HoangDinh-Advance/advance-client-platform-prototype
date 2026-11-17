@@ -102,7 +102,7 @@
         <div class="brand-wrap">
           ${brand('b2b-loans')}
           <span class="b2b-tag">B2B</span>
-          <span class="demo-controls"><span>Demo · Sample data</span><button type="button" class="text-button" data-act="demo-reset">Reset demo</button></span>
+          <span class="demo-controls"><span>Bản demo · Dữ liệu mẫu</span><button type="button" class="text-button" data-act="demo-reset">Đặt lại demo</button></span>
         </div>
       </header>`;
     }
@@ -122,8 +122,8 @@
   var PORTAL_NAV = [
     { route: 'tong-quan', label: 'Tổng quan' },
     { route: 'mua-ban-no', label: 'Mua bán nợ' },
-    { route: 'invoice-financing', label: 'Invoice Financing' },
-    { route: 'payroll-financing', label: 'Payroll Financing' }
+    { route: 'invoice-financing', label: 'Tài trợ hóa đơn' },
+    { route: 'payroll-financing', label: 'Tài trợ lương' }
   ];
 
   function sidebarHtml() {
@@ -136,11 +136,11 @@
       </nav></aside>`;
     }
     var pending = App.demo ? App.demo.pendingCancelRequests.length : 0;
-    return html`<aside class="sidebar"><nav aria-label="Main">
-      <a href="#b2b-loans" aria-current="${view.nav === 'b2b-loans' ? 'page' : 'false'}">Loans</a>
-      <div class="nav-group">Debit authorization</div>
-      <a href="#b2b-cancel-requests" aria-current="${view.nav === 'b2b-cancel-requests' ? 'page' : 'false'}">Cancel requests ${pending > 0 && html`<span class="count">${pending}</span>`}</a>
-      <a href="#b2b-authorizations" aria-current="${view.nav === 'b2b-authorizations' ? 'page' : 'false'}">Authorizations</a>
+    return html`<aside class="sidebar"><nav aria-label="Chính">
+      <a href="#b2b-loans" aria-current="${view.nav === 'b2b-loans' ? 'page' : 'false'}">Giao dịch</a>
+      <div class="nav-group">Ủy quyền trích nợ</div>
+      <a href="#b2b-cancel-requests" aria-current="${view.nav === 'b2b-cancel-requests' ? 'page' : 'false'}">Yêu cầu hủy ${pending > 0 && html`<span class="count">${pending}</span>`}</a>
+      <a href="#b2b-authorizations" aria-current="${view.nav === 'b2b-authorizations' ? 'page' : 'false'}">Danh sách ủy quyền</a>
     </nav></aside>`;
   }
 
@@ -156,23 +156,12 @@
       cancelRequest: 'Yêu cầu hủy ủy quyền', saleRequest: 'Yêu cầu bán nợ',
       approve: 'Advance duyệt', reject: 'Advance từ chối', reason: 'Lý do từ chối (bắt buộc)', reasonMissing: 'Vui lòng nhập lý do từ chối.',
       otpRule: 'Mã OTP: nhập đủ số ký tự bất kỳ là đúng, nhập toàn số 0 là sai.',
-      hintLead: 'Thông tin đăng ký đúng trên B2B:', hintAgreement: 'Mã hợp đồng', hintPhone: 'SĐT', hintAccount: 'Transaction account',
+      hintLead: 'Thông tin đăng ký đúng trên B2B:', hintAgreement: 'Mã hợp đồng', hintPhone: 'SĐT', hintAccount: 'Tài khoản Giao dịch',
       reset: 'Đặt lại demo', other: 'Mở B2B (nội bộ Advance)', otherRoute: 'b2b-loans'
     },
-    en: {
-      title: 'Demo controls', show: 'Show', hide: 'Hide',
-      register: 'Registration result', otp: 'OTP validity', debit: 'Debit order result',
-      registerOptions: [['ok', 'Success'], ['18', 'Code 18 · Business code mismatch'], ['19', 'Code 19 · Account holder mismatch'], ['20', 'Code 20 · Phone mismatch'], ['24', 'Code 24 · Invalid account'], ['99', 'Code 99 · System busy']],
-      otpOptions: [['120', '2 minutes'], ['15', '15 seconds']],
-      debitOptions: [['ok', 'Success'], ['balance', 'Insufficient balance'], ['limit', 'Over limit'], ['none', 'No result']],
-      pending: 'Requests waiting for Advance', none: 'No pending requests.',
-      cancelRequest: 'Cancel request', saleRequest: 'Sale request',
-      approve: 'Approve', reject: 'Reject', reason: 'Reject reason (required)', reasonMissing: 'Enter a reject reason.',
-      otpRule: 'OTP: any code of the right length is accepted, all zeros is rejected.',
-      hintLead: 'Registration details on B2B:', hintAgreement: 'Agreement number', hintPhone: 'Phone', hintAccount: 'Transaction account',
-      reset: 'Reset demo', other: 'Open client portal', otherRoute: 'tong-quan'
-    }
+    b2b: null
   };
+  DEMO_TEXT.b2b = Object.assign({}, DEMO_TEXT.vi, { other: 'Mở cổng khách hàng', otherRoute: 'tong-quan' });
 
   function options(list, selected) {
     return list.map(function (o) { return html`<option value="${o[0]}" ${String(selected) === o[0] ? raw('selected') : ''}>${o[1]}</option>`; });
@@ -180,9 +169,8 @@
 
   function demoPanelHtml() {
     var demo = App.demo;
-    var lang = App.view.mode === 'b2b' ? 'en' : 'vi';
-    var t = DEMO_TEXT[lang];
-    var num = lang === 'en' ? fmt.en : fmt.vn;
+    var t = DEMO_TEXT[App.view.mode === 'b2b' ? 'b2b' : 'vi'];
+    var num = fmt.vn;
     if (!demo) return '';
     var body = '';
     if (App.demoOpen) {
@@ -278,7 +266,7 @@
     if (!App.view) return;
     var rootEl = document.getElementById('app');
     document.body.dataset.surface = App.view.mode === 'login' ? 'gradient' : 'flat';
-    document.documentElement.lang = App.view.mode === 'b2b' ? 'en' : 'vi';
+    document.documentElement.lang = 'vi';
     var snap = snapshot(rootEl);
     rootEl.innerHTML = String(shellHtml());
     restore(rootEl, snap);
@@ -406,7 +394,7 @@
         App.me = null;
         App.demoOpen = false;
         Object.keys(App.views).forEach(function (key) { if (App.views[key].reset) App.views[key].reset(); });
-        toast(App.view.mode === 'b2b' ? 'Demo data has been reset.' : 'Đã đặt lại dữ liệu demo.');
+        toast('Đã đặt lại dữ liệu demo.');
         if (App.view.mode === 'b2b') go(App.routeName); else go('dang-nhap');
       });
     },
@@ -418,7 +406,7 @@
       if (!reason) {
         input.setAttribute('aria-invalid', 'true');
         input.focus();
-        toast(DEMO_TEXT[App.view.mode === 'b2b' ? 'en' : 'vi'].reasonMissing, true);
+        toast(DEMO_TEXT.vi.reasonMissing, true);
         return;
       }
       run(api.b2b.rejectCancelRequest(id, reason).then(refresh));

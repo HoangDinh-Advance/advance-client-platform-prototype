@@ -737,7 +737,7 @@
 
   route('GET', '/b2b/loans/{loanId}', function (state, req) {
     var loan = state.loans.find(function (l) { return l.id === req.params.loanId; });
-    if (!loan) return fail(404, 'LOAN_NOT_FOUND', 'Loan not found.');
+    if (!loan) return fail(404, 'LOAN_NOT_FOUND', 'Không tìm thấy giao dịch.');
     var ctx = debitContext(state, loan);
     var view = loanView(state, loan);
     view.schedule = loan.schedule.map(function (l) { return { dueDate: l.dueDate, invoiceNo: l.invoiceNo || loan.invoiceNo, amount: l.amount, collected: l.collected }; });
@@ -750,15 +750,15 @@
 
   route('POST', '/b2b/loans/{loanId}/debit-orders', function (state, req) {
     var loan = state.loans.find(function (l) { return l.id === req.params.loanId; });
-    if (!loan) return fail(404, 'LOAN_NOT_FOUND', 'Loan not found.');
+    if (!loan) return fail(404, 'LOAN_NOT_FOUND', 'Không tìm thấy giao dịch.');
     var ctx = debitContext(state, loan);
-    if (!ctx.auth) return fail(409, 'NO_ACTIVE_AUTHORIZATION', 'No active debit authorization.');
-    if (ctx.blocking) return fail(409, 'ORDER_IN_PROGRESS', 'A debit order is still processing or has no result.');
+    if (!ctx.auth) return fail(409, 'NO_ACTIVE_AUTHORIZATION', 'Chưa có ủy quyền trích nợ đang hiệu lực.');
+    if (ctx.blocking) return fail(409, 'ORDER_IN_PROGRESS', 'Đang có lệnh trích nợ chưa xử lý xong hoặc chưa nhận được kết quả.');
     var amount = Number((req.body || {}).amount);
     var note = String((req.body || {}).note || '').trim();
-    if (!Number.isInteger(amount) || amount <= 0) return fail(422, 'AMOUNT_INVALID', 'Amount must be greater than 0.');
-    if (amount > loan.outstanding) return fail(422, 'AMOUNT_OVER_OUTSTANDING', 'Amount exceeds the outstanding receivable.', { outstanding: loan.outstanding });
-    if (note.length > 100) return fail(422, 'NOTE_TOO_LONG', 'Note is limited to 100 characters.');
+    if (!Number.isInteger(amount) || amount <= 0) return fail(422, 'AMOUNT_INVALID', 'Số tiền phải lớn hơn 0.');
+    if (amount > loan.outstanding) return fail(422, 'AMOUNT_OVER_OUTSTANDING', 'Số tiền vượt quá số còn phải thu.', { outstanding: loan.outstanding });
+    if (note.length > 100) return fail(422, 'NOTE_TOO_LONG', 'Ghi chú tối đa 100 ký tự.');
     state.seq.order += 1;
     var d = new Date();
     var order = {
@@ -772,7 +772,7 @@
 
   route('GET', '/b2b/debit-orders/{orderId}/status', function (state, req) {
     var order = state.debitOrders.find(function (o) { return o.id === req.params.orderId; });
-    if (!order) return fail(404, 'ORDER_NOT_FOUND', 'Debit order not found.');
+    if (!order) return fail(404, 'ORDER_NOT_FOUND', 'Không tìm thấy lệnh trích nợ.');
     if (order.status === 'NO_RESULT') {
       // Tra cứu EPAY: lấy kết quả theo thiết lập demo hiện tại; "Không nhận được kết quả" thì coi như thành công.
       var result = state.demo.debitResult === 'none' ? 'ok' : state.demo.debitResult;
@@ -791,7 +791,7 @@
 
   route('GET', '/b2b/debit-auth/cancel-requests/{id}', function (state, req) {
     var request = state.cancelRequests.find(function (r) { return r.id === req.params.id; });
-    if (!request) return fail(404, 'REQUEST_NOT_FOUND', 'Cancel request not found.');
+    if (!request) return fail(404, 'REQUEST_NOT_FOUND', 'Không tìm thấy yêu cầu hủy.');
     var view = cancelRequestView(state, request);
     view.outstandingLoans = state.loans.filter(function (l) { return l.buyerTaxCode === request.buyerTaxCode && l.outstanding > 0; })
       .map(function (l) { return { id: l.id, outstanding: l.outstanding, dueDate: nextDue(l), invoiceNo: l.invoiceNo }; });
@@ -800,17 +800,17 @@
 
   function decideCancel(state, id, approve, reason) {
     var request = state.cancelRequests.find(function (r) { return r.id === id; });
-    if (!request) return fail(404, 'REQUEST_NOT_FOUND', 'Cancel request not found.');
-    if (request.status !== 'PENDING') return fail(409, 'REQUEST_ALREADY_DECIDED', 'This request has already been decided.');
+    if (!request) return fail(404, 'REQUEST_NOT_FOUND', 'Không tìm thấy yêu cầu hủy.');
+    if (request.status !== 'PENDING') return fail(409, 'REQUEST_ALREADY_DECIDED', 'Yêu cầu này đã được xử lý.');
     var auth = state.auths.find(function (a) { return a.id === request.authId; });
     if (approve) {
       var result = epay.cancel(auth);
-      if (result.errorCode !== '00') return fail(502, 'EPAY_ERROR', 'EPAY could not cancel the authorization.', { epayCode: result.errorCode });
+      if (result.errorCode !== '00') return fail(502, 'EPAY_ERROR', 'EPAY chưa hủy được ủy quyền.', { epayCode: result.errorCode });
       request.status = 'APPROVED';
       auth.status = 'CANCELLED';
     } else {
       var text = String(reason || '').trim();
-      if (!text) return fail(422, 'REASON_REQUIRED', 'A reason is required to reject.');
+      if (!text) return fail(422, 'REASON_REQUIRED', 'Cần nhập lý do khi từ chối.');
       request.status = 'REJECTED';
       request.rejectReason = text;
       auth.status = 'ACTIVE';
