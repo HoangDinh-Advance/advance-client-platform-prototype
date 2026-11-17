@@ -395,7 +395,7 @@
   };
 
   function hasUnregistered(d) { return d.rp.buyers.some(function (b) { return b.authStatus === 'NONE'; }); }
-  function showChooser(d) { return !App.uiPrefs().rpEntered && hasUnregistered(d); }
+  function showChooser(d) { return App.autoDebit() && !App.uiPrefs().rpEntered && hasUnregistered(d); }
   function buyerOf(d, taxCode) { return d.rp.buyers.find(function (b) { return b.taxCode === taxCode; }) || null; }
   function selectedInvoices() {
     var d = rp.data;
@@ -432,6 +432,20 @@
   }
 
   function whitelistHtml(d) {
+    // Không có trích nợ tự động: chỉ còn danh sách và tỷ lệ mua nợ.
+    if (!App.autoDebit()) {
+      return html`<section class="card" aria-labelledby="whitelist-title">
+        <div class="card-head"><h2 id="whitelist-title">Danh sách Bên thanh toán được chấp nhận</h2></div>
+        <div class="table-wrap" id="whitelist-wrap">
+          <table class="data-table" style="min-width: 520px">
+            <thead><tr><th>Bên thanh toán</th><th>MST</th><th class="num">(2) Tỷ lệ mua nợ</th></tr></thead>
+            <tbody>${d.rp.buyers.map(function (b) {
+              return html`<tr><td><div class="cell-main">${b.name}</div></td><td class="mono">${b.taxCode}</td><td class="num strong">${b.rate}%</td></tr>`;
+            })}</tbody>
+          </table>
+        </div>
+      </section>`;
+    }
     var rows = d.rp.buyers.map(function (b) {
       var action = '';
       if (b.authStatus === 'NONE' || b.authStatus === 'PENDING_OTP') {
@@ -634,7 +648,7 @@
       <dl class="facts box">
         <div><dt>Bên thanh toán</dt><dd>${sale.buyer.name}</dd></div>
         <div><dt>MST</dt><dd class="mono">${sale.buyer.taxCode}</dd></div>
-        <div><dt>Ủy quyền trích nợ</dt><dd>${App.authTag(sale.buyer.authStatus)}</dd></div>
+        ${App.autoDebit() && html`<div><dt>Ủy quyền trích nợ</dt><dd>${App.authTag(sale.buyer.authStatus)}</dd></div>`}
         <div><dt>(2) Tỷ lệ mua nợ</dt><dd>${sale.rate}%</dd></div>
       </dl>
       <div class="sale-table table-wrap" id="sale-wrap">

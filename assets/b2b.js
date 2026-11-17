@@ -106,7 +106,7 @@
             </table>
           </div>
         </section>
-        ${debitCardHtml(d)}`;
+        ${App.autoDebit() && debitCardHtml(d)}`;
     },
     actions: {
       'debit-amount': function (el) {

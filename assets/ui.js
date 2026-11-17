@@ -138,9 +138,9 @@
     var pending = App.demo ? App.demo.pendingCancelRequests.length : 0;
     return html`<aside class="sidebar"><nav aria-label="Chính">
       <a href="#b2b-loans" aria-current="${view.nav === 'b2b-loans' ? 'page' : 'false'}">Giao dịch</a>
-      <div class="nav-group">Ủy quyền trích nợ</div>
+      ${autoDebit() && html`<div class="nav-group">Ủy quyền trích nợ</div>
       <a href="#b2b-cancel-requests" aria-current="${view.nav === 'b2b-cancel-requests' ? 'page' : 'false'}">Yêu cầu hủy ${pending > 0 && html`<span class="count">${pending}</span>`}</a>
-      <a href="#b2b-authorizations" aria-current="${view.nav === 'b2b-authorizations' ? 'page' : 'false'}">Danh sách ủy quyền</a>
+      <a href="#b2b-authorizations" aria-current="${view.nav === 'b2b-authorizations' ? 'page' : 'false'}">Danh sách ủy quyền</a>`}
     </nav></aside>`;
   }
 
@@ -174,6 +174,7 @@
     if (!demo) return '';
     var body = '';
     if (App.demoOpen) {
+      var epay = autoDebit();
       var requests = demo.pendingCancelRequests.map(function (r) {
         return html`<div class="demo-request">
           <span class="grow"><strong>${t.cancelRequest} ${r.id}</strong> · ${r.buyerName}</span>
@@ -190,20 +191,20 @@
       }));
       body = html`<div class="demo-body" id="demo-body">
         <div class="demo-row">
-          <div class="demo-item"><label for="demo-register">${t.register}</label>
-            <select class="select" id="demo-register" data-change="demo-setting" data-key="registerResult">${options(t.registerOptions, demo.settings.registerResult)}</select></div>
+          ${epay && html`<div class="demo-item"><label for="demo-register">${t.register}</label>
+            <select class="select" id="demo-register" data-change="demo-setting" data-key="registerResult">${options(t.registerOptions, demo.settings.registerResult)}</select></div>`}
           <div class="demo-item"><label for="demo-otp">${t.otp}</label>
             <select class="select" id="demo-otp" data-change="demo-setting" data-key="otpSeconds">${options(t.otpOptions, demo.settings.otpSeconds)}</select></div>
-          <div class="demo-item"><label for="demo-debit">${t.debit}</label>
-            <select class="select" id="demo-debit" data-change="demo-setting" data-key="debitResult">${options(t.debitOptions, demo.settings.debitResult)}</select></div>
+          ${epay && html`<div class="demo-item"><label for="demo-debit">${t.debit}</label>
+            <select class="select" id="demo-debit" data-change="demo-setting" data-key="debitResult">${options(t.debitOptions, demo.settings.debitResult)}</select></div>`}
         </div>
         <div class="demo-list">
           <div class="demo-sub">${t.pending}</div>
           ${requests.length ? requests : html`<div class="demo-note">${t.none}</div>`}
         </div>
-        <p class="demo-note">${t.otpRule} ${t.hintLead} ${t.hintAgreement} ${demo.hints.agreementNo} · ${t.hintPhone} ${demo.hints.phone} · ${demo.hints.accounts.map(function (a, i) {
+        <p class="demo-note">${t.otpRule}${epay && html` ${t.hintLead} ${t.hintAgreement} ${demo.hints.agreementNo} · ${t.hintPhone} ${demo.hints.phone} · ${demo.hints.accounts.map(function (a, i) {
           return html`${i ? ' · ' : ''}${t.hintAccount} ${a.buyerName}: ${a.bankName} ${a.accountNo}`;
-        })}.</p>
+        })}.`}</p>
         <div class="demo-foot">
           <button type="button" class="btn btn-outline btn-sm" data-act="demo-reset">${t.reset}</button>
           <a class="text-button" href="#${t.otherRoute}">${t.other}</a>
@@ -312,6 +313,7 @@
     return jobs[0].then(function (demo) {
       if (token !== loadToken) return null;
       App.demo = demo;
+      if (!autoDebit() && AUTO_DEBIT_ROUTES[App.routeName]) { go(AUTO_DEBIT_ROUTES[App.routeName]); return null; }
       if (view.mode === 'portal' && !demo.loggedIn) { go('dang-nhap'); return null; }
       if (view.mode === 'login' && demo.loggedIn) { go('tong-quan'); return null; }
       var loads = [view.load ? view.load() : Promise.resolve(null)];
@@ -332,6 +334,10 @@
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(function () { if (App.view) refresh(); }, 80);
   }
+
+  // Trích nợ tự động (EPAY) bật hay tắt do backend báo qua /demo/state.
+  var AUTO_DEBIT_ROUTES = { 'dang-ky-trich-no': 'mua-ban-no', 'huy-uy-quyen': 'mua-ban-no', 'b2b-cancel-requests': 'b2b-loans', 'b2b-authorizations': 'b2b-loans' };
+  function autoDebit() { return !!(App.demo && App.demo.features && App.demo.features.autoDebit); }
 
   function go(routeName, params) {
     App.navParams = params || null;
@@ -445,6 +451,7 @@
   App.raw = raw;
   App.fmt = fmt;
   App.formatMoneyInput = formatMoneyInput;
+  App.autoDebit = autoDebit;
   App.authTag = authTag;
   App.AUTH_STATUS = AUTH_STATUS;
   App.toast = toast;

@@ -8,6 +8,8 @@
   var STORAGE_KEY = 'advance-client-platform-demo/v5';
   // Ngày "hôm nay" của bản demo được cố định để dữ liệu mẫu ở spec §2 luôn đúng (đến hạn, quá hạn).
   var DEMO_TODAY = '2026-11-12';
+  // Trích nợ tự động qua EPAY: tắt từ 17/11. Đổi thành true thì mọi màn và API liên quan trở lại.
+  var AUTO_DEBIT_ENABLED = false;
   var DEMO_EMAIL = 'ketoan.mauanphuc@gmail.com';
   // Hóa đơn (đầu ra và đầu vào) quá số ngày này kể từ ngày hóa đơn thì không chọn được.
   var MAX_INVOICE_AGE_DAYS = 90;
@@ -182,6 +184,7 @@
     return list.length ? list[list.length - 1] : null;
   }
   function authStatus(state, buyer) {
+    if (!AUTO_DEBIT_ENABLED) return 'NONE';
     if (buyer.txnStatus !== 'Opened') return 'NOT_ELIGIBLE';
     var auth = latestAuth(state, buyer.taxCode);
     return auth ? auth.status : 'NONE';
@@ -265,7 +268,7 @@
   /* ------------------------------------------------------------------ view models */
   function buyerView(state, buyer) {
     var status = authStatus(state, buyer);
-    var auth = latestAuth(state, buyer.taxCode);
+    var auth = AUTO_DEBIT_ENABLED ? latestAuth(state, buyer.taxCode) : null;
     var bank = bankBy(buyer.bankCode);
     return {
       taxCode: buyer.taxCode,
@@ -745,6 +748,7 @@
     view.suggestedAmount = ctx.nextLine ? ctx.nextLine.amount - ctx.nextLine.collected : 0;
     view.sendLocked = !!ctx.blocking;
     view.orders = ctx.orders.map(orderView);
+    if (!AUTO_DEBIT_ENABLED) { view.authorization = null; view.orders = []; view.sendLocked = false; }
     return ok(view);
   }, { pub: true });
 
@@ -834,7 +838,8 @@
       today: DEMO_TODAY,
       loggedIn: state.session.loggedIn,
       settings: Object.assign({}, state.demo),
-      pendingCancelRequests: state.cancelRequests.filter(function (r) { return r.status === 'PENDING'; }).map(function (r) { return cancelRequestView(state, r); }),
+      features: { autoDebit: AUTO_DEBIT_ENABLED },
+      pendingCancelRequests: !AUTO_DEBIT_ENABLED ? [] : state.cancelRequests.filter(function (r) { return r.status === 'PENDING'; }).map(function (r) { return cancelRequestView(state, r); }),
       pendingSaleRequests: state.saleRequests.filter(function (r) { return r.status === 'SUBMITTED'; }).map(function (r) { return saleRequestView(state, r); }),
       hints: {
         agreementNo: state.customer.agreementNo, phone: state.customer.phone,
@@ -882,6 +887,10 @@
       query[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
     });
 
+    if (!AUTO_DEBIT_ENABLED && /\/debit-auth|\/debit-orders/.test(pathname)) {
+      return fail(404, 'FEATURE_DISABLED', 'Chức năng trích nợ tự động đang tắt.');
+    }
+
     if (method === 'POST' && pathname === '/demo/reset') {
       save(seed());
       return ok({});
@@ -920,6 +929,7 @@
     handle: handle,
     tick: tick,
     subscribe: function (fn) { listeners.push(fn); return function () { listeners = listeners.filter(function (x) { return x !== fn; }); }; },
+    setAutoDebit: function (enabled) { AUTO_DEBIT_ENABLED = !!enabled; },
     DEMO_TODAY: DEMO_TODAY
   };
 })(typeof window !== 'undefined' ? window : globalThis);

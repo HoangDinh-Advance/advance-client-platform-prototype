@@ -48,6 +48,7 @@ Chỉ sửa hàm `transport(method, path, body)` trong `assets/api.js` thành `f
 - **Ngày đến hạn dự kiến (thêm 13/11)** = ngày hóa đơn + kỳ hạn thanh toán của Bên thanh toán (`paymentTermDays` trong dữ liệu mẫu), theo RRP-SPEC §3b.
 - **Gói và phí dự kiến của Invoice Financing (thêm 13/11):** màn xác nhận cho chọn Gói 30 / 60 / 90 Ngày và hiện phí dịch vụ dự kiến = tổng hóa đơn × mức phí (số mẫu 1,65% / 3,3% / 4,95%, đã gồm VAT).
 - **Payroll Financing (thêm 17/11):** trang riêng với luồng Tạo yêu cầu chi lương → tải bảng lương → xác nhận Gói và phí dự kiến → gửi yêu cầu, kèm Lịch sử yêu cầu. Bản demo không đọc nội dung tệp: tệp nào (.xlsx, .xls, .csv) cũng trả về bảng lương mẫu 25 nhân viên, tổng 483.000.000 VND; tệp không rời khỏi trình duyệt.
+- **Trích nợ tự động qua EPAY đang tắt (17/11):** các màn đăng ký và hủy ủy quyền, lựa chọn 90% / 80%, thẻ Trích nợ tự động, Yêu cầu hủy và Danh sách ủy quyền trên B2B không còn hiện; mọi Bên thanh toán dùng tỷ lệ mua nợ 80%. Tắt bằng một công tắc `AUTO_DEBIT_ENABLED` trong `assets/mock-server.js`; mã nguồn phần này vẫn còn, đổi thành `true` là bật lại.
 - **Toàn bộ giao diện bằng tiếng Việt (17/11):** kể cả phần B2B, số và ngày theo kiểu Việt (`1.090.909.091`, `dd/mm/yyyy`). Tên sản phẩm trên giao diện: Tài trợ lương (Payroll Financing), Tài trợ hóa đơn (Invoice Financing), Mua bán nợ; "Transaction account" hiện là Tài khoản Giao dịch.
 - **Nhà cung cấp được chấp thuận (thêm 13/11):** màn Invoice Financing có danh sách này; hóa đơn của nhà cung cấp ngoài danh sách bị khóa.
 
