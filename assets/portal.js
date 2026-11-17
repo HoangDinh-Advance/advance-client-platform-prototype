@@ -609,7 +609,7 @@
       ${chosen.length > 0 && html`<div class="notice-row"><p class="banner" role="status">Mỗi yêu cầu chỉ gồm hóa đơn của một Bên thanh toán. Bỏ chọn để đổi Bên thanh toán.</p></div>`}
       <div class="table-wrap" id="invoices-wrap">
         <table class="data-table" style="min-width: 800px">
-          <thead><tr><th class="check-cell"><span hidden>Chọn</span></th><th>Số hóa đơn</th><th>Bên mua</th><th>Ngày lập</th><th class="num">Chưa VAT</th><th class="num">Gồm VAT</th><th>Trạng thái</th></tr></thead>
+          <thead><tr><th class="check-cell"><span hidden>Chọn</span></th><th>Số hóa đơn</th><th>Bên mua</th><th>Ngày lập</th><th class="num">Giá trị hóa đơn chưa VAT</th><th class="num">Giá trị hóa đơn gồm VAT</th><th>Trạng thái</th></tr></thead>
           <tbody>${rows.length ? rows : html`<tr><td colspan="7" class="empty-rows">${empty}</td></tr>`}</tbody>
         </table>
       </div>
