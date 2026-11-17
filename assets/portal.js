@@ -1365,7 +1365,7 @@
           </div>
           <div class="table-wrap" id="if-wrap">
             <table class="data-table" style="min-width: 700px">
-              <thead><tr><th class="check-cell"><span hidden>Chọn</span></th><th>Số hóa đơn</th><th>Nhà cung cấp</th><th>Ngày lập</th><th class="num">Tổng tiền</th><th>Trạng thái</th></tr></thead>
+              <thead><tr><th class="check-cell"><span hidden>Chọn</span></th><th>Số hóa đơn</th><th>Nhà cung cấp</th><th>Ngày lập</th><th class="num">Giá trị hóa đơn (bao gồm VAT)</th><th>Trạng thái</th></tr></thead>
               <tbody>${rows.length ? rows : html`<tr><td colspan="6" class="empty-rows">${q ? 'Không có hóa đơn phù hợp với bộ lọc.' : 'Không có hóa đơn trong khoảng ngày đã chọn.'}</td></tr>`}</tbody>
             </table>
           </div>
