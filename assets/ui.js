@@ -122,7 +122,8 @@
   var PORTAL_NAV = [
     { route: 'tong-quan', label: 'Tổng quan' },
     { route: 'mua-ban-no', label: 'Mua bán nợ' },
-    { route: 'invoice-financing', label: 'Invoice Financing' }
+    { route: 'invoice-financing', label: 'Invoice Financing' },
+    { route: 'payroll-financing', label: 'Payroll Financing' }
   ];
 
   function sidebarHtml() {

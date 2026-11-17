@@ -1271,4 +1271,182 @@
       </div>
     </div>`;
   }
+
+  /* ================================================================== Payroll Financing: tạo yêu cầu chi lương */
+  var PF_ERRORS = {
+    FILE_TYPE_INVALID: 'Bảng lương phải là tệp .xlsx, .xls hoặc .csv.',
+    AMOUNT_OVER_LIMIT: 'Tổng số tiền chi lương vượt quá hạn mức Payroll Financing còn lại.',
+    PAYROLL_FILE_ALREADY_USED: 'Bảng lương này đã được gửi. Vui lòng đóng cửa sổ và tạo yêu cầu mới.'
+  };
+
+  var pf = App.views['payroll-financing'] = {
+    mode: 'portal', nav: 'payroll-financing',
+    state: { flow: null },
+    reset: function () { this.state = { flow: null }; },
+    enter: function () { this.state.flow = null; },
+    load: function () {
+      return Promise.all([api.getPfRequests(), api.getOverview(), api.getPfPackages()]).then(function (r) {
+        return { requests: r[0].items, limit: r[1].limits.find(function (l) { return l.product === 'PF'; }), packages: r[2].packages };
+      });
+    },
+    render: function () {
+      var d = this.data;
+      if (!d) return html`<div class="page-head"><h1>Payroll Financing</h1></div>${loadingCard()}`;
+      var rows = d.requests.map(function (r) {
+        var status = SALE_REQUEST_STATUS[r.status];
+        return html`<tr>
+          <td class="mono strong">${r.id}</td>
+          <td class="mono nowrap">${fmt.vnDateTime(r.submittedAt)}</td>
+          <td>${r.fileName}</td>
+          <td class="num">${r.employeeCount}</td>
+          <td class="num strong">${vn(r.totalAmount)}</td>
+          <td class="nowrap">${r.tenorDays} Ngày</td>
+          <td class="num">${vn(r.expectedFee)}</td>
+          <td><span class="tag ${status.cls}">${status.label}</span></td>
+        </tr>`;
+      });
+      return html`<div class="page-head"><h1>Payroll Financing</h1>
+          <button type="button" class="btn btn-primary" data-act="pf-open">Tạo yêu cầu chi lương</button></div>
+        <section class="card" aria-labelledby="pf-history-title">
+          <div class="card-head"><h2 id="pf-history-title">Lịch sử yêu cầu</h2></div>
+          <div class="table-wrap" id="pf-history-wrap">
+            <table class="data-table" style="min-width: 860px">
+              <thead><tr><th>Mã yêu cầu</th><th>Ngày gửi</th><th>Bảng lương</th><th class="num">Số nhân viên</th><th class="num">Tổng số tiền chi lương</th><th>Gói</th><th class="num">Phí dịch vụ dự kiến</th><th>Trạng thái</th></tr></thead>
+              <tbody>${rows.length ? rows : html`<tr><td colspan="8" class="empty-rows">Chưa có yêu cầu chi lương nào.</td></tr>`}</tbody>
+            </table>
+          </div>
+        </section>`;
+    },
+    actions: {
+      'pf-open': function () {
+        pf.state.flow = {
+          step: 'upload', file: null, uploading: false, error: '', packages: pf.data.packages,
+          tenorDays: pf.data.packages[0].tenorDays, available: pf.data.limit.available, sending: false, result: null
+        };
+        App.openDialog({ render: pfDialogHtml, locked: function () { var f = pf.state.flow; return f && (f.sending || f.uploading); } });
+      },
+      'pf-file': function (el) {
+        var picked = el.files && el.files[0];
+        if (picked) pfUpload({ fileName: picked.name, fileSize: picked.size });
+      },
+      'pf-sample': function () { pfUpload({ fileName: 'Bang-luong-thang-11-2026.xlsx', fileSize: 18432 }); },
+      'pf-clear': function () { pf.state.flow.file = null; pf.state.flow.error = ''; App.paintDialog(); },
+      'pf-next': function () {
+        var f = pf.state.flow;
+        f.error = f.file.totalAmount > f.available ? PF_ERRORS.AMOUNT_OVER_LIMIT : '';
+        f.step = 'confirm';
+        App.paintDialog();
+      },
+      'pf-back': function () { pf.state.flow.step = 'upload'; pf.state.flow.error = ''; App.paintDialog(); },
+      'pf-package': function (el) { pf.state.flow.tenorDays = Number(el.value); App.paintDialog(); },
+      'pf-send': function () {
+        var f = pf.state.flow;
+        f.sending = true;
+        f.error = '';
+        App.paintDialog();
+        api.createPfRequest(f.file.fileId, f.tenorDays).then(function (result) {
+          f.sending = false;
+          f.step = 'done';
+          f.result = result;
+          App.paintDialog();
+          App.refresh();
+        }).catch(function (error) {
+          f.sending = false;
+          f.error = PF_ERRORS[error.code] || error.message;
+          App.paintDialog();
+        });
+      },
+      'pf-close': function () { pf.state.flow = null; App.closeDialog(); }
+    }
+  };
+
+  function pfUpload(meta) {
+    var f = pf.state.flow;
+    f.uploading = true;
+    f.error = '';
+    App.paintDialog();
+    api.uploadPayrollFile(meta).then(function (file) {
+      f.uploading = false;
+      f.file = file;
+      App.paintDialog();
+    }).catch(function (error) {
+      f.uploading = false;
+      f.error = PF_ERRORS[error.code] || error.message;
+      App.paintDialog();
+    });
+  }
+
+  function pfDialogHtml() {
+    var f = pf.state.flow;
+    if (!f) return '';
+    if (f.step === 'done') {
+      return html`<div class="modal-body center">
+        ${checkIcon()}
+        <h2 id="dialog-title">Đã gửi yêu cầu</h2>
+        <p>Đã gửi yêu cầu chi lương ${f.result.id} tới Advance.</p>
+        <button type="button" class="btn btn-primary btn-block" data-act="pf-close" data-autofocus>Đóng</button>
+      </div>`;
+    }
+    if (f.step === 'confirm') {
+      var pack = ifPackage(f);
+      return html`<div class="modal-body">
+        <div class="eyebrow">Payroll Financing</div>
+        <h2 id="dialog-title">Xác nhận yêu cầu chi lương</h2>
+        <dl class="receipt">
+          <div><dt>Bảng lương</dt><dd>${f.file.fileName}</dd></div>
+          <div><dt>Số nhân viên</dt><dd class="mono">${f.file.employeeCount}</dd></div>
+          <div class="receipt-total"><dt>Tổng số tiền chi lương</dt><dd class="mono nowrap">${vn(f.file.totalAmount)} VND</dd></div>
+        </dl>
+        <div class="field">
+          <label class="field-label" for="pf-package">Gói</label>
+          <select class="input" id="pf-package" data-change="pf-package" ${f.sending ? App.raw('disabled') : ''}>
+            ${f.packages.map(function (p) { return html`<option value="${p.tenorDays}" ${p.tenorDays === f.tenorDays ? App.raw('selected') : ''}>${p.tenorDays} Ngày</option>`; })}
+          </select>
+        </div>
+        <dl class="receipt">
+          <div><dt>Mức phí (đã gồm VAT 10%)</dt><dd class="mono">${ifRateText(pack.feeRateBp)}</dd></div>
+          <div class="receipt-total"><dt>Phí dịch vụ dự kiến (VND, đã bao gồm VAT)</dt><dd class="mono nowrap">${vn(ifFee(f.file.totalAmount, pack.feeRateBp))} VND</dd></div>
+        </dl>
+        <p>Hạn mức Payroll Financing còn lại: <strong class="mono">${vn(f.available)} VND</strong></p>
+        ${f.error && html`<p class="banner banner-danger" role="alert">${f.error}</p>`}
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" data-act="pf-back" ${f.sending ? App.raw('disabled') : ''}>Quay lại</button>
+          <button type="button" class="btn btn-primary" data-act="pf-send" data-autofocus ${f.sending || f.file.totalAmount > f.available ? App.raw('disabled') : ''}>${f.sending ? 'Đang gửi…' : 'Gửi yêu cầu'}</button>
+        </div>
+      </div>`;
+    }
+    return html`<div class="modal-body">
+      <div class="eyebrow">Payroll Financing</div>
+      <h2 id="dialog-title">Tạo yêu cầu chi lương</h2>
+      ${f.file ? html`<dl class="facts box">
+          <div><dt>Bảng lương</dt><dd>${f.file.fileName}</dd></div>
+          <div><dt>Số nhân viên</dt><dd class="mono">${f.file.employeeCount}</dd></div>
+          <div><dt>Tổng số tiền chi lương</dt><dd class="mono">${vn(f.file.totalAmount)} VND</dd></div>
+        </dl>
+        <div class="sale-table table-wrap" id="pf-preview-wrap">
+          <table class="data-table" style="min-width: 440px">
+            <thead><tr><th>STT</th><th>Họ và tên</th><th>Ngân hàng</th><th>Số tài khoản</th><th class="num">Số tiền (VND)</th></tr></thead>
+            <tbody>${f.file.preview.map(function (row) {
+              return html`<tr><td class="mono">${row.no}</td><td>${row.name}</td><td>${row.bankName}</td><td class="mono">${row.accountNo}</td><td class="num">${vn(row.amount)}</td></tr>`;
+            })}</tbody>
+            <tfoot><tr><td colspan="5">và ${f.file.moreCount} nhân viên khác</td></tr></tfoot>
+          </table>
+        </div>
+        <button type="button" class="text-button" data-act="pf-clear">Chọn bảng lương khác</button>`
+      : html`<div class="upload-box">
+          <div class="upload-title">Tải lên bảng lương</div>
+          <div class="upload-hint">${f.uploading ? 'Đang đọc bảng lương…' : 'Tệp .xlsx, .xls hoặc .csv'}</div>
+          <div class="upload-actions">
+            <label class="btn btn-primary file-pick ${f.uploading ? 'is-disabled' : ''}">Chọn tệp
+              <input type="file" id="pf-file" accept=".xlsx,.xls,.csv" data-change="pf-file" ${f.uploading ? App.raw('disabled') : ''}></label>
+            <button type="button" class="btn btn-outline" data-act="pf-sample" ${f.uploading ? App.raw('disabled') : ''}>Dùng bảng lương mẫu</button>
+          </div>
+        </div>`}
+      ${f.error && html`<p class="banner banner-danger" role="alert">${f.error}</p>`}
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" data-act="pf-close" ${f.uploading ? App.raw('disabled') : ''}>Đóng</button>
+        <button type="button" class="btn btn-primary" data-act="pf-next" ${f.file ? '' : App.raw('disabled')}>Tiếp tục</button>
+      </div>
+    </div>`;
+  }
 })();

@@ -15,7 +15,7 @@ Trang tĩnh thuần HTML/CSS/JS, không cần build.
 
 | Phần | Địa chỉ |
 |---|---|
-| Cổng khách hàng (tiếng Việt) | `#tong-quan`, `#mua-ban-no`, `#dang-ky-trich-no`, `#huy-uy-quyen`, `#invoice-financing` |
+| Cổng khách hàng (tiếng Việt) | `#tong-quan`, `#mua-ban-no`, `#dang-ky-trich-no`, `#huy-uy-quyen`, `#invoice-financing`, `#payroll-financing` |
 | B2B (tiếng Anh) | `#b2b-loans`, `#b2b-loan`, `#b2b-cancel-requests`, `#b2b-authorizations` |
 
 Cổng và B2B dùng chung một kho trạng thái trong `localStorage`. Mở hai tab cạnh nhau thì thao tác bên này hiện ngay bên kia. Link sang B2B nằm trong khung **Thiết lập demo** ở đầu mỗi trang.
@@ -29,7 +29,7 @@ Cổng và B2B dùng chung một kho trạng thái trong `localStorage`. Mở ha
 | `assets/api.js` | **Lớp `api` duy nhất.** Giao diện chỉ gọi các hàm ở đây |
 | `assets/mock-server.js` | Backend giả: dữ liệu mẫu spec §2, handler theo endpoint spec §5, EPAY giả lập |
 | `assets/ui.js` | Khung trang, bảng Thiết lập demo, hộp thoại, điều hướng |
-| `assets/portal.js` | S1 đến S4 của cổng khách hàng |
+| `assets/portal.js` | S1 đến S4 của cổng khách hàng, và trang Payroll Financing |
 | `assets/b2b.js` | B1 Auto-debit card, B2 Cancel requests, B3 Debit authorizations |
 
 ### Nối API thật
@@ -47,6 +47,7 @@ Chỉ sửa hàm `transport(method, path, body)` trong `assets/api.js` thành `f
 - **Duyệt yêu cầu bán nợ (thêm 16/11):** bấm "Advance duyệt" ở Thiết lập demo sinh giao dịch mới `DEMO-RRP-000n`, Principal amount = Giá Mua nợ đề nghị; giao dịch hiện ở Lịch thanh toán của khách (mỗi hóa đơn một dòng) và ở bảng Loans của B2B.
 - **Ngày đến hạn dự kiến (thêm 13/11)** = ngày hóa đơn + kỳ hạn thanh toán của Bên thanh toán (`paymentTermDays` trong dữ liệu mẫu), theo RRP-SPEC §3b.
 - **Gói và phí dự kiến của Invoice Financing (thêm 13/11):** màn xác nhận cho chọn Gói 30 / 60 / 90 Ngày và hiện phí dịch vụ dự kiến = tổng hóa đơn × mức phí (số mẫu 1,65% / 3,3% / 4,95%, đã gồm VAT).
+- **Payroll Financing (thêm 17/11):** trang riêng với luồng Tạo yêu cầu chi lương → tải bảng lương → xác nhận Gói và phí dự kiến → gửi yêu cầu, kèm Lịch sử yêu cầu. Bản demo không đọc nội dung tệp: tệp nào (.xlsx, .xls, .csv) cũng trả về bảng lương mẫu 25 nhân viên, tổng 483.000.000 VND; tệp không rời khỏi trình duyệt.
 - **Nhà cung cấp được chấp thuận (thêm 13/11):** màn Invoice Financing có danh sách này; hóa đơn của nhà cung cấp ngoài danh sách bị khóa.
 
 ## Đã kiểm tra

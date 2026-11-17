@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  var STORAGE_KEY = 'advance-client-platform-demo/v4';
+  var STORAGE_KEY = 'advance-client-platform-demo/v5';
   // Ngày "hôm nay" của bản demo được cố định để dữ liệu mẫu ở spec §2 luôn đúng (đến hạn, quá hạn).
   var DEMO_TODAY = '2026-11-12';
   var DEMO_EMAIL = 'ketoan.mauanphuc@gmail.com';
@@ -24,6 +24,24 @@
     { tenorDays: 90, feeRateBp: 495 }
   ];
   function ifFee(amount, feeRateBp) { return Math.floor((amount * feeRateBp + 5000) / 10000); }
+  // Gói Payroll Financing và bảng lương mẫu. Bản demo không đọc nội dung tệp tải lên:
+  // tệp nào cũng trả về bảng lương mẫu này. Số mẫu tự đặt.
+  var PF_PACKAGES = [
+    { tenorDays: 30, feeRateBp: 165 },
+    { tenorDays: 60, feeRateBp: 330 }
+  ];
+  var PAYROLL_SAMPLE = (function () {
+    var names = ['Nguyễn Văn An', 'Trần Thị Bình', 'Lê Minh Châu', 'Phạm Quốc Dũng', 'Hoàng Thị Giang', 'Vũ Đức Hải', 'Đặng Thu Hà',
+      'Bùi Anh Khoa', 'Đỗ Thị Lan', 'Ngô Văn Long', 'Dương Thị Mai', 'Lý Hoàng Nam', 'Phan Thị Ngọc', 'Trịnh Văn Phúc', 'Đinh Thị Quỳnh',
+      'Hồ Minh Sơn', 'Mai Thị Tâm', 'Tạ Quang Thái', 'Cao Thị Thảo', 'Lâm Văn Toàn', 'Châu Thị Trang', 'Kiều Minh Tuấn', 'La Thị Uyên',
+      'Quách Văn Vinh', 'Tô Thị Yến'];
+    var banks = ['Vietcombank', 'MSB', 'MB Bank', 'Techcombank', 'BIDV'];
+    return names.map(function (name, i) {
+      return { no: i + 1, name: name, bankName: banks[i % banks.length], accountNo: '****' + String(1000 + (i * 739) % 9000),
+        amount: 12000000 + ((i * 37) % 11) * 1500000 };
+    });
+  })();
+  var PAYROLL_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
   var OTP_TRIES = 3;
   var OTP_MAX_SENDS = 5;
   var RATE_WITH_AUTH = 90;
@@ -35,7 +53,7 @@
       version: 1,
       session: { loggedIn: false },
       demo: { registerResult: 'ok', otpSeconds: 120, debitResult: 'ok' },
-      seq: { sale: 0, ifReq: 0, cancel: 0, auth: 1, order: 0, loan: 3 },
+      seq: { sale: 0, ifReq: 0, pfReq: 0, pfFile: 0, cancel: 0, auth: 1, order: 0, loan: 3 },
       customer: {
         name: 'Công ty TNHH Mẫu An Phúc',
         taxCode: '0100000001',
@@ -96,6 +114,8 @@
       ],
       saleRequests: [],
       ifRequests: [],
+      payrollFiles: [],
+      pfRequests: [],
       cancelRequests: [],
       debitOrders: []
     };
@@ -605,6 +625,56 @@
 
   route('GET', '/portal/me/if/requests', function (state) {
     return ok({ items: state.ifRequests.map(function (r) { return ifRequestView(state, r); }) });
+  });
+
+  // ---- Payroll Financing: tạo yêu cầu chi lương -> tải bảng lương -> gửi yêu cầu
+  function payrollFileView(file) {
+    return {
+      fileId: file.id, fileName: file.fileName, employeeCount: PAYROLL_SAMPLE.length, totalAmount: file.totalAmount,
+      preview: PAYROLL_SAMPLE.slice(0, 5), moreCount: PAYROLL_SAMPLE.length - 5
+    };
+  }
+
+  route('GET', '/portal/me/pf/packages', function () {
+    return ok({ packages: PF_PACKAGES.map(function (p) { return { tenorDays: p.tenorDays, feeRateBp: p.feeRateBp }; }) });
+  });
+
+  route('POST', '/portal/me/pf/payroll-files', function (state, req) {
+    var name = String((req.body || {}).fileName || '').trim();
+    var lower = name.toLowerCase();
+    if (!name || !PAYROLL_EXTENSIONS.some(function (ext) { return lower.slice(-ext.length) === ext; })) {
+      return fail(422, 'FILE_TYPE_INVALID', 'Bảng lương phải là tệp .xlsx, .xls hoặc .csv.');
+    }
+    var file = {
+      id: nextId(state, 'pfFile', 'BL-'), fileName: name, uploadedAt: nowStamp(), used: false,
+      totalAmount: PAYROLL_SAMPLE.reduce(function (sum, row) { return sum + row.amount; }, 0)
+    };
+    state.payrollFiles.push(file);
+    return ok(payrollFileView(file));
+  });
+
+  route('POST', '/portal/me/pf/requests', function (state, req) {
+    var body = req.body || {};
+    var file = state.payrollFiles.find(function (f) { return f.id === body.fileId; });
+    if (!file) return fail(422, 'PAYROLL_FILE_NOT_FOUND', 'Chưa có bảng lương.');
+    if (file.used) return fail(422, 'PAYROLL_FILE_ALREADY_USED', 'Bảng lương này đã được gửi.');
+    var pack = PF_PACKAGES.find(function (p) { return p.tenorDays === Number(body.tenorDays); });
+    if (!pack) return fail(422, 'PACKAGE_INVALID', 'Gói không hợp lệ.');
+    if (file.totalAmount > available(state.limits.PF)) {
+      return fail(422, 'AMOUNT_OVER_LIMIT', 'Tổng số tiền chi lương vượt quá hạn mức còn lại.', { available: available(state.limits.PF) });
+    }
+    var request = {
+      id: nextId(state, 'pfReq', 'YCPF-'), fileId: file.id, fileName: file.fileName, employeeCount: PAYROLL_SAMPLE.length,
+      totalAmount: file.totalAmount, tenorDays: pack.tenorDays, feeRateBp: pack.feeRateBp,
+      expectedFee: ifFee(file.totalAmount, pack.feeRateBp), submittedAt: nowStamp(), status: 'SUBMITTED'
+    };
+    file.used = true;
+    state.pfRequests.unshift(request);
+    return ok(Object.assign({}, request));
+  });
+
+  route('GET', '/portal/me/pf/requests', function (state) {
+    return ok({ items: state.pfRequests.map(function (r) { return Object.assign({}, r); }) });
   });
 
   // ---- B2B nội bộ
