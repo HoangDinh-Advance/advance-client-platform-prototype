@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  var STORAGE_KEY = 'advance-client-platform-demo/v6';
+  var STORAGE_KEY = 'advance-client-platform-demo/v7';
   // Ngày "hôm nay" của bản demo được cố định để dữ liệu mẫu ở spec §2 luôn đúng (đến hạn, quá hạn).
   var DEMO_TODAY = '2026-11-12';
   // Trích nợ tự động qua EPAY: tắt từ 17/11. Đổi thành true thì mọi màn và API liên quan trở lại.
@@ -66,8 +66,9 @@
         phone: '0901234567'
       },
       limits: {
-        PF: { granted: 2000000000, used: 710000000 },
-        IF: { granted: 3000000000, used: 1200000000 },
+        // Đã dùng gồm cả hai khoản mẫu thêm để minh họa trễ hạn và đến hạn trong tuần (xem loans).
+        PF: { granted: 2000000000, used: 860000000 },
+        IF: { granted: 3000000000, used: 1400000000 },
         RP: { granted: 5000000000, used: 500000000 }
       },
       loans: [
@@ -78,6 +79,11 @@
           schedule: [{ dueDate: '2026-11-20', amount: 1500000000, collected: 300000000 }] },
         { id: 'DEMO-RRP-0003', product: 'RP', buyerTaxCode: '0309876543', invoiceNo: '00000398', dueDate: '2026-12-03', dpd: 0, outstanding: 500000000,
           schedule: [{ dueDate: '2026-12-03', amount: 500000000, collected: 0 }] },
+        // Hai khoản mẫu tự đặt để Lịch thanh toán có đủ ba kiểu tô nổi: trễ hạn 7 ngày và đến hạn trong tuần này.
+        { id: 'DEMO-IF-1004', product: 'IF', buyerTaxCode: null, invoiceNo: null, dueDate: '2026-11-05', dpd: 7, outstanding: 200000000,
+          schedule: [{ dueDate: '2026-11-05', amount: 200000000, collected: 0 }] },
+        { id: 'DEMO-PF-1005', product: 'PF', buyerTaxCode: null, invoiceNo: null, dueDate: '2026-11-14', dpd: 0, outstanding: 150000000,
+          schedule: [{ dueDate: '2026-11-14', amount: 150000000, collected: 0 }] },
         // Các khoản đã thanh toán xong, cho tab Đã thanh toán (dữ liệu mẫu tự đặt).
         { id: 'DEMO-PF-1001', product: 'PF', buyerTaxCode: null, invoiceNo: null, dueDate: '2026-10-12', dpd: 0, outstanding: 0,
           schedule: [{ dueDate: '2026-10-12', amount: 650000000, collected: 650000000, paidAt: '2026-10-12' }] },
