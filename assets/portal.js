@@ -1240,7 +1240,7 @@
   };
 
   /* ================================================================== S4. Tài trợ hóa đơn (sơ bộ) */
-  function freshIf() { return { q: '', from: DEFAULT_FROM, to: '', selected: {}, confirm: null }; }
+  function freshIf() { return { tab: 'all', q: '', from: DEFAULT_FROM, to: '', selected: {}, confirm: null }; }
   var IF_STATUS = { NEW: { label: 'Hóa đơn mới', cls: '' }, REQUESTED: { label: 'Đã gửi yêu cầu', cls: 'tag-warn' } };
 
   var invf = App.views['invoice-financing'] = {
@@ -1267,9 +1267,15 @@
       var st = this.state;
       if (!d) return html`<div class="page-head"><h1>Tài trợ hóa đơn</h1></div>${loadingCard()}`;
       var q = st.q.trim().toLowerCase();
-      var items = d.invoices.filter(function (i) {
+      var base = d.invoices.filter(function (i) {
         return !q || i.number.toLowerCase().indexOf(q) >= 0 || i.partyName.toLowerCase().indexOf(q) >= 0 || i.partyTaxCode.indexOf(q) >= 0;
       });
+      var counts = {
+        all: base.length,
+        unsent: base.filter(function (i) { return i.status === 'NEW'; }).length,
+        sent: base.filter(function (i) { return i.status !== 'NEW'; }).length
+      };
+      var items = base.filter(function (i) { return st.tab === 'all' || (st.tab === 'sent') === (i.status !== 'NEW'); });
       var rows = items.map(function (i) {
         var selected = !!st.selected[i.id];
         var approved = supplierApproved(d, i);
@@ -1301,6 +1307,11 @@
         </section>
         <section class="card" aria-labelledby="if-title">
           <div class="card-head"><h2 id="if-title">Hóa đơn đầu vào</h2></div>
+          <div class="sale-tabs" role="tablist" aria-label="Trạng thái yêu cầu">
+            ${[['all', 'Tất cả'], ['unsent', 'Chưa gửi yêu cầu'], ['sent', 'Đã gửi yêu cầu']].map(function (tab) {
+              return html`<button type="button" role="tab" class="sale-tab" data-act="if-tab" data-tab="${tab[0]}" aria-selected="${st.tab === tab[0] ? 'true' : 'false'}">${tab[1]}<span>${counts[tab[0]]}</span></button>`;
+            })}
+          </div>
           <div class="filters">
             <input class="input input-sm search" id="if-search" type="search" data-input="if-search" aria-label="Tìm hóa đơn" placeholder="Tìm số hóa đơn, tên hoặc MST nhà cung cấp…" autocomplete="off" value="${st.q}">
             <div class="dates">
@@ -1334,6 +1345,7 @@
       </section>`;
     },
     actions: {
+      'if-tab': function (el) { invf.state.tab = el.getAttribute('data-tab'); App.paint(); },
       'if-search': function (el) { invf.state.q = el.value; App.paint(); },
       'if-filter': function (el) { invf.state[el.getAttribute('data-key')] = el.value; invf.state.selected = {}; App.paint(); App.refresh(); },
       'if-toggle': function (el) {
