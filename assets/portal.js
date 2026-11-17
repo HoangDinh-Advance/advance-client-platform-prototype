@@ -180,18 +180,24 @@
   };
 
   /* ================================================================== S2. Tổng quan */
-  App.views['tong-quan'] = {
+  var overview = App.views['tong-quan'] = {
     mode: 'portal', nav: 'tong-quan',
+    state: { tab: 'due' },
+    reset: function () { this.state = { tab: 'due' }; },
     load: function () { return api.getOverview(); },
+    actions: {
+      'ov-tab': function (el) { overview.state.tab = el.getAttribute('data-tab'); App.paint(); }
+    },
     render: function () {
       var d = this.data;
+      var tab = this.state.tab;
       if (!d) return html`<div class="page-head"><h1>Tổng quan</h1></div>${loadingCard()}`;
 
       var cards = d.limits.map(function (limit) {
         var pct = limit.granted > 0 ? Math.min(100, Math.round(limit.used / limit.granted * 100)) : 0;
         return html`<div class="metric">
           <div class="metric-label">${PRODUCT[limit.product]}</div>
-          <div class="metric-caption">Còn lại</div>
+          <div class="metric-caption">Hạn mức còn lại</div>
           <div class="metric-value">${vn(limit.available)} <small>VND</small></div>
           <div class="progress" role="img" aria-label="Đã dùng ${vn(limit.used)} / ${vn(limit.granted)} VND"><span style="width: ${pct}%"></span></div>
           <dl class="limit-facts">
@@ -201,41 +207,79 @@
         </div>`;
       });
 
-      var groups = {};
-      d.schedule.forEach(function (row) { (groups[row.dueDate] = groups[row.dueDate] || []).push(row); });
-      var bodies = Object.keys(groups).sort().map(function (date) {
-        var rows = groups[date];
-        var total = rows.reduce(function (sum, r) { return sum + r.amountDue; }, 0);
-        return html`<tbody>
-          <tr class="group-head"><td colspan="7">Đến hạn ${fmt.vnWeekday(date)}, ${fmt.vnDate(date)}${date === d.today ? ' (hôm nay)' : ''} · ${rows.length} khoản · ${vn(total)} VND</td></tr>
-          ${rows.map(function (r) {
-            return html`<tr>
-              <td class="mono strong nowrap">${r.loanId}</td>
-              <td><span class="tag tag-product">${PRODUCT[r.product]}</span></td>
-              <td>${r.buyerName ? r.buyerName + ' · ' + r.invoiceNo : '—'}</td>
-              <td class="strong">${r.payer === 'BUYER' ? r.payerName : 'Quý khách'}</td>
-              <td class="mono nowrap">${fmt.vnDate(r.dueDate)}</td>
-              <td class="num ${r.dpd > 0 ? 'overdue' : ''}">${r.dpd}</td>
-              <td class="num strong">${vn(r.amountDue)}</td>
-            </tr>`;
-          })}
-          <tr class="group-total"><td colspan="6">Tổng · ${rows.length} khoản</td><td class="num">${vn(total)}</td></tr>
-        </tbody>`;
-      });
+      // Bên thanh toán + hóa đơn: Mua bán nợ là Bên thanh toán của hóa đơn, các sản phẩm khác là chính khách hàng.
+      function party(r) { return r.payer === 'BUYER' ? r.buyerName + ' · ' + r.invoiceNo : 'Quý khách'; }
 
+      var table;
+      if (tab === 'paid') {
+        var paidRows = d.paid.map(function (r) {
+          return html`<tr>
+            <td class="mono strong nowrap">${r.loanId}</td>
+            <td><span class="tag tag-product">${PRODUCT[r.product]}</span></td>
+            <td>${party(r)}</td>
+            <td class="mono nowrap">${fmt.vnDate(r.dueDate)}</td>
+            <td class="mono nowrap">${fmt.vnDate(r.paidDate)}</td>
+            <td class="num">${vn(r.financedAmount)}</td>
+            <td class="num strong">${vn(r.paidAmount)}</td>
+          </tr>`;
+        });
+        table = html`<table class="data-table wrap-head" style="min-width: 760px">
+          <thead><tr>
+            <th>Mã giao dịch</th><th>Sản phẩm</th><th>Bên thanh toán / Hóa đơn</th><th>Ngày đến hạn</th><th>Ngày thanh toán</th>
+            <th class="num">Số tiền tài trợ (VND)</th><th class="num">Số tiền đã trả (VND)</th>
+          </tr></thead>
+          <tbody>${paidRows.length ? paidRows : html`<tr><td colspan="7" class="empty-rows">Chưa có khoản nào đã thanh toán.</td></tr>`}</tbody>
+        </table>`;
+      } else {
+        var groups = {};
+        d.schedule.forEach(function (row) { (groups[row.dueDate] = groups[row.dueDate] || []).push(row); });
+        var bodies = Object.keys(groups).sort().map(function (date) {
+          var rows = groups[date];
+          var total = rows.reduce(function (sum, r) { return sum + r.amountDue; }, 0);
+          return html`<tbody>
+            <tr class="group-head"><td colspan="8">Đến hạn ${fmt.vnWeekday(date)}, ${fmt.vnDate(date)}${date === d.today ? ' (hôm nay)' : ''} · ${rows.length} khoản · ${vn(total)} VND</td></tr>
+            ${rows.map(function (r) {
+              return html`<tr class="${r.dueThisWeek ? 'is-due-week' : ''}">
+                <td class="mono strong nowrap">${r.loanId}</td>
+                <td><span class="tag tag-product">${PRODUCT[r.product]}</span></td>
+                <td>${party(r)}</td>
+                <td class="mono nowrap">${fmt.vnDate(r.dueDate)}${r.dueThisWeek && html` <span class="tag tag-warn">Trong tuần</span>`}</td>
+                <td class="num ${r.dpd > 0 ? 'overdue' : ''}">${r.dpd}</td>
+                <td class="num">${vn(r.financedAmount)}</td>
+                <td class="num">${vn(r.paidAmount)}</td>
+                <td class="num strong">${vn(r.amountDue)}</td>
+              </tr>`;
+            })}
+          </tbody>`;
+        });
+        table = html`<table class="data-table wrap-head" style="min-width: 820px">
+          <thead><tr>
+            <th>Mã giao dịch</th><th>Sản phẩm</th><th>Bên thanh toán / Hóa đơn</th>
+            <th>Ngày đến hạn</th><th class="num">Số ngày quá hạn</th>
+            <th class="num">Số tiền tài trợ (VND)</th><th class="num">Số tiền đã trả (VND)</th><th class="num">Số tiền đến hạn còn lại (VND)</th>
+          </tr></thead>
+          ${bodies.length ? bodies : html`<tbody><tr><td colspan="8" class="empty-rows">Không có khoản nào đến hạn.</td></tr></tbody>`}
+        </table>`;
+      }
+
+      var pay = d.paymentInfo;
       return html`<div class="page-head"><h1>Tổng quan</h1></div>
         <section class="limit-grid" aria-label="Hạn mức theo sản phẩm">${cards}</section>
-        <section class="card" aria-labelledby="schedule-title">
-          <div class="card-head"><h2 id="schedule-title">Lịch thanh toán</h2></div>
-          <div class="table-wrap" id="schedule-wrap">
-            <table class="data-table" style="min-width: 860px">
-              <thead><tr>
-                <th>Mã giao dịch</th><th>Sản phẩm</th><th>Bên thanh toán / hóa đơn</th><th>Người trả</th>
-                <th>Ngày đến hạn</th><th class="num">Số ngày quá hạn</th><th class="num">Số tiền đến hạn (VND)</th>
-              </tr></thead>
-              ${bodies.length ? bodies : html`<tbody><tr><td colspan="7" class="empty-rows">Không có khoản nào đến hạn.</td></tr></tbody>`}
-            </table>
+        <section class="card" aria-label="Lịch thanh toán">
+          <div class="sale-tabs" role="tablist" aria-label="Lịch thanh toán">
+            <button type="button" role="tab" class="sale-tab" data-act="ov-tab" data-tab="due" aria-selected="${tab === 'due' ? 'true' : 'false'}">Lịch thanh toán<span>${d.schedule.length}</span></button>
+            <button type="button" role="tab" class="sale-tab" data-act="ov-tab" data-tab="paid" aria-selected="${tab === 'paid' ? 'true' : 'false'}">Đã thanh toán<span>${d.paid.length}</span></button>
           </div>
+          <div class="table-wrap" id="schedule-wrap">${table}</div>
+        </section>
+        <section class="card card-pad" aria-labelledby="payinfo-title">
+          <h2 class="card-title" id="payinfo-title">Thông tin thanh toán</h2>
+          <dl class="facts">
+            <div><dt>Tên tài khoản</dt><dd>${pay.accountName}</dd></div>
+            <div><dt>Ngân hàng</dt><dd>${pay.bankName}</dd></div>
+            <div><dt>Số tài khoản</dt><dd class="mono">${pay.accountNo}</dd></div>
+            <div><dt>Nội dung chuyển khoản</dt><dd class="mono">${pay.transferContent}</dd></div>
+          </dl>
         </section>`;
     }
   };

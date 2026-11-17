@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  var STORAGE_KEY = 'advance-client-platform-demo/v5';
+  var STORAGE_KEY = 'advance-client-platform-demo/v6';
   // Ngày "hôm nay" của bản demo được cố định để dữ liệu mẫu ở spec §2 luôn đúng (đến hạn, quá hạn).
   var DEMO_TODAY = '2026-11-12';
   // Trích nợ tự động qua EPAY: tắt từ 17/11. Đổi thành true thì mọi màn và API liên quan trở lại.
@@ -58,6 +58,7 @@
       seq: { sale: 0, ifReq: 0, pfReq: 0, pfFile: 0, cancel: 0, auth: 1, order: 0, loan: 3 },
       customer: {
         name: 'Công ty TNHH Mẫu An Phúc',
+        shortName: 'ANPHUC',
         taxCode: '0100000001',
         // Đăng nhập: email của khách hàng + MST, xác thực bằng OTP gửi tới email này.
         email: DEMO_EMAIL,
@@ -72,10 +73,18 @@
       loans: [
         { id: 'DEMO-PF-0001', product: 'PF', buyerTaxCode: null, invoiceNo: null, dueDate: '2026-11-12', dpd: 0, outstanding: 710000000,
           schedule: [{ dueDate: '2026-11-12', amount: 710000000, collected: 0 }] },
+        // Đã trả một phần: số tiền tài trợ 1.500.000.000 = đã trả 300.000.000 + còn lại 1.200.000.000.
         { id: 'DEMO-IF-0002', product: 'IF', buyerTaxCode: null, invoiceNo: null, dueDate: '2026-11-20', dpd: 0, outstanding: 1200000000,
-          schedule: [{ dueDate: '2026-11-20', amount: 1200000000, collected: 0 }] },
+          schedule: [{ dueDate: '2026-11-20', amount: 1500000000, collected: 300000000 }] },
         { id: 'DEMO-RRP-0003', product: 'RP', buyerTaxCode: '0309876543', invoiceNo: '00000398', dueDate: '2026-12-03', dpd: 0, outstanding: 500000000,
-          schedule: [{ dueDate: '2026-12-03', amount: 500000000, collected: 0 }] }
+          schedule: [{ dueDate: '2026-12-03', amount: 500000000, collected: 0 }] },
+        // Các khoản đã thanh toán xong, cho tab Đã thanh toán (dữ liệu mẫu tự đặt).
+        { id: 'DEMO-PF-1001', product: 'PF', buyerTaxCode: null, invoiceNo: null, dueDate: '2026-10-12', dpd: 0, outstanding: 0,
+          schedule: [{ dueDate: '2026-10-12', amount: 650000000, collected: 650000000, paidAt: '2026-10-12' }] },
+        { id: 'DEMO-IF-1002', product: 'IF', buyerTaxCode: null, invoiceNo: null, dueDate: '2026-10-20', dpd: 0, outstanding: 0,
+          schedule: [{ dueDate: '2026-10-20', amount: 900000000, collected: 900000000, paidAt: '2026-10-19' }] },
+        { id: 'DEMO-RRP-1003', product: 'RP', buyerTaxCode: '0312345678', invoiceNo: '00000371', dueDate: '2026-10-30', dpd: 0, outstanding: 0,
+          schedule: [{ dueDate: '2026-10-30', amount: 400000000, collected: 400000000, paidAt: '2026-10-30' }] }
       ],
       // Buyer whitelist, lấy từ Credit information. Transaction account lưu theo từng Bên thanh toán.
       // paymentTermDays: kỳ hạn thanh toán của hợp đồng mua bán, dùng tính ngày đến hạn dự kiến (số mẫu tự đặt).
@@ -260,6 +269,7 @@
     loan.schedule.forEach(function (line) {
       var take = Math.min(left, line.amount - line.collected);
       line.collected += take;
+      if (take > 0 && line.collected >= line.amount && !line.paidAt) line.paidAt = DEMO_TODAY;
       left -= take;
     });
     state.limits[loan.product].used = Math.max(0, state.limits[loan.product].used - amount);
@@ -467,19 +477,41 @@
       return { product: product, granted: limit.granted, used: limit.used, available: available(limit) };
     });
     // Mỗi hóa đơn của giao dịch Mua bán nợ có ngày đến hạn riêng, nên mỗi dòng lịch chưa thu là một dòng.
+    // Số tiền tài trợ = số tiền đã trả + số tiền đến hạn còn lại. Dòng đã trả hết sang danh sách Đã thanh toán.
+    var todayNo = dayNumber(DEMO_TODAY);
+    var weekStart = todayNo - ((todayNo + 3) % 7); // thứ Hai của tuần này
     var schedule = [];
-    state.loans.filter(function (loan) { return loan.outstanding > 0; }).forEach(function (loan) {
+    var paid = [];
+    state.loans.forEach(function (loan) {
       var buyer = loan.buyerTaxCode ? buyerBy(state, loan.buyerTaxCode) : null;
-      loan.schedule.filter(function (l) { return l.amount - l.collected > 0; }).forEach(function (line) {
-        schedule.push({
+      loan.schedule.forEach(function (line) {
+        var row = {
           loanId: loan.id, product: loan.product,
           buyerName: buyer ? buyer.name : null, invoiceNo: line.invoiceNo || loan.invoiceNo,
           payer: buyer ? 'BUYER' : 'CUSTOMER', payerName: buyer ? buyer.name : null,
-          dueDate: line.dueDate, dpd: loan.dpd, amountDue: line.amount - line.collected
-        });
+          dueDate: line.dueDate, financedAmount: line.amount, paidAmount: line.collected
+        };
+        if (line.amount - line.collected > 0) {
+          var dueNo = dayNumber(line.dueDate);
+          row.dpd = loan.dpd;
+          row.amountDue = line.amount - line.collected;
+          row.dueThisWeek = dueNo >= weekStart && dueNo <= weekStart + 6;
+          schedule.push(row);
+        } else {
+          row.paidDate = line.paidAt || null;
+          paid.push(row);
+        }
       });
     });
-    return ok({ today: DEMO_TODAY, limits: limits, schedule: schedule });
+    paid.sort(function (a, b) { return (b.paidDate || '') < (a.paidDate || '') ? -1 : 1; });
+    return ok({
+      today: DEMO_TODAY, limits: limits, schedule: schedule, paid: paid,
+      // Thông tin thanh toán của Advance, nội dung chuyển khoản theo tên viết tắt của khách hàng. Số tài khoản là số mẫu.
+      paymentInfo: {
+        accountName: 'CÔNG TY TNHH ADVANCE VIETNAM', bankName: 'Ngân hàng TMCP Hàng Hải Việt Nam (MSB)', accountNo: '0123456789',
+        transferContent: (state.customer.shortName || 'ANPHUC') + ' thanh toan'
+      }
+    });
   });
 
   route('GET', '/portal/me/rp/buyers', function (state) {
