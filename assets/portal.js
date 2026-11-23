@@ -1400,7 +1400,7 @@
         var items = ifSelected();
         invf.state.confirm = {
           step: 'confirm', items: items, total: items.reduce(function (s, i) { return s + i.amountIncVat; }, 0),
-          available: invf.data.limit.available, packages: invf.data.packages, tenorDays: invf.data.packages[0].tenorDays,
+          available: invf.data.limit.available, packages: invf.data.packages, tenorDays: invf.data.packages.length ? invf.data.packages[0].tenorDays : null,
           sending: false, error: '', result: null
         };
         App.openDialog({ render: ifDialogHtml, locked: function () { return invf.state.confirm && invf.state.confirm.sending; } });
@@ -1463,9 +1463,9 @@
   }
 
   function ifPackage(c) { return c.packages.find(function (p) { return p.tenorDays === c.tenorDays; }) || c.packages[0]; }
-  // Phí = tổng giá trị hóa đơn × mức phí, làm tròn nửa lên đến đồng. feeRateBp tính theo phần vạn.
-  function ifFee(amount, feeRateBp) { return Math.floor((amount * feeRateBp + 5000) / 10000); }
-  function ifRateText(feeRateBp) { return String(feeRateBp / 100).replace('.', ',') + '%'; }
+  // Phí = tổng giá trị × mức phí, làm tròn nửa lên đến đồng. Mức phí theo phần nghìn của phần trăm (1650 = 1,65%).
+  function ifFee(amount, feeRateMilli) { return Math.floor((amount * feeRateMilli + 50000) / 100000); }
+  function ifRateText(feeRateMilli) { return (feeRateMilli / 1000).toFixed(3).replace(/\.?0+$/, '').replace('.', ',') + '%'; }
 
   function ifSelected() {
     if (!invf.data) return [];
@@ -1490,21 +1490,21 @@
         ${c.items.map(function (i) { return html`<div><dt>${i.number} · ${i.partyName}</dt><dd class="mono nowrap">${vn(i.amountIncVat)} VND</dd></div>`; })}
         <div class="receipt-total"><dt>Tổng (gồm VAT)</dt><dd class="mono nowrap">${vn(c.total)} VND</dd></div>
       </dl>
-      <div class="field">
+      ${c.packages.length ? html`<div class="field">
         <label class="field-label" for="if-package">Gói</label>
         <select class="input" id="if-package" data-change="if-package" ${c.sending ? App.raw('disabled') : ''}>
           ${c.packages.map(function (p) { return html`<option value="${p.tenorDays}" ${p.tenorDays === c.tenorDays ? App.raw('selected') : ''}>${p.tenorDays} Ngày</option>`; })}
         </select>
       </div>
       <dl class="receipt">
-        <div><dt>Mức phí (đã gồm VAT 10%)</dt><dd class="mono">${ifRateText(ifPackage(c).feeRateBp)}</dd></div>
-        <div class="receipt-total"><dt>Phí dịch vụ dự kiến (VND, đã bao gồm VAT)</dt><dd class="mono nowrap">${vn(ifFee(c.total, ifPackage(c).feeRateBp))} VND</dd></div>
-      </dl>
+        <div><dt>Mức phí (đã gồm VAT 10%)</dt><dd class="mono">${ifRateText(ifPackage(c).feeRateMilli)}</dd></div>
+        <div class="receipt-total"><dt>Phí dịch vụ dự kiến (VND, đã bao gồm VAT)</dt><dd class="mono nowrap">${vn(ifFee(c.total, ifPackage(c).feeRateMilli))} VND</dd></div>
+      </dl>` : html`<p class="banner banner-warn" role="status">Chưa có biểu phí Tài trợ hóa đơn cho Quý khách. Vui lòng liên hệ Advance.</p>`}
       <p>Hạn mức Tài trợ hóa đơn còn lại: <strong class="mono">${vn(c.available)} VND</strong></p>
       ${c.error && html`<p class="banner banner-danger" role="alert">${c.error}</p>`}
       <div class="modal-actions">
         <button type="button" class="btn btn-outline" data-act="if-close" ${c.sending ? App.raw('disabled') : ''}>Quay lại</button>
-        <button type="button" class="btn btn-primary" data-act="if-send" data-autofocus ${c.sending ? App.raw('disabled') : ''}>${c.sending ? 'Đang gửi…' : 'Gửi yêu cầu'}</button>
+        <button type="button" class="btn btn-primary" data-act="if-send" data-autofocus ${c.sending || !c.packages.length ? App.raw('disabled') : ''}>${c.sending ? 'Đang gửi…' : 'Gửi yêu cầu'}</button>
       </div>
     </div>`;
   }
@@ -1558,7 +1558,7 @@
       'pf-open': function () {
         pf.state.flow = {
           step: 'upload', file: null, uploading: false, error: '', packages: pf.data.packages,
-          tenorDays: pf.data.packages[0].tenorDays, available: pf.data.limit.available, sending: false, result: null
+          tenorDays: pf.data.packages.length ? pf.data.packages[0].tenorDays : null, available: pf.data.limit.available, sending: false, result: null
         };
         App.openDialog({ render: pfDialogHtml, locked: function () { var f = pf.state.flow; return f && (f.sending || f.uploading); } });
       },
@@ -1634,21 +1634,21 @@
           <div><dt>Số nhân viên</dt><dd class="mono">${f.file.employeeCount}</dd></div>
           <div class="receipt-total"><dt>Tổng số tiền chi lương</dt><dd class="mono nowrap">${vn(f.file.totalAmount)} VND</dd></div>
         </dl>
-        <div class="field">
+        ${f.packages.length ? html`<div class="field">
           <label class="field-label" for="pf-package">Gói</label>
           <select class="input" id="pf-package" data-change="pf-package" ${f.sending ? App.raw('disabled') : ''}>
             ${f.packages.map(function (p) { return html`<option value="${p.tenorDays}" ${p.tenorDays === f.tenorDays ? App.raw('selected') : ''}>${p.tenorDays} Ngày</option>`; })}
           </select>
         </div>
         <dl class="receipt">
-          <div><dt>Mức phí (đã gồm VAT 10%)</dt><dd class="mono">${ifRateText(pack.feeRateBp)}</dd></div>
-          <div class="receipt-total"><dt>Phí dịch vụ dự kiến (VND, đã bao gồm VAT)</dt><dd class="mono nowrap">${vn(ifFee(f.file.totalAmount, pack.feeRateBp))} VND</dd></div>
-        </dl>
+          <div><dt>Mức phí (đã gồm VAT 10%)</dt><dd class="mono">${ifRateText(pack.feeRateMilli)}</dd></div>
+          <div class="receipt-total"><dt>Phí dịch vụ dự kiến (VND, đã bao gồm VAT)</dt><dd class="mono nowrap">${vn(ifFee(f.file.totalAmount, pack.feeRateMilli))} VND</dd></div>
+        </dl>` : html`<p class="banner banner-warn" role="status">Chưa có biểu phí Tài trợ lương cho Quý khách. Vui lòng liên hệ Advance.</p>`}
         <p>Hạn mức Tài trợ lương còn lại: <strong class="mono">${vn(f.available)} VND</strong></p>
         ${f.error && html`<p class="banner banner-danger" role="alert">${f.error}</p>`}
         <div class="modal-actions">
           <button type="button" class="btn btn-outline" data-act="pf-back" ${f.sending ? App.raw('disabled') : ''}>Quay lại</button>
-          <button type="button" class="btn btn-primary" data-act="pf-send" data-autofocus ${f.sending || f.file.totalAmount > f.available ? App.raw('disabled') : ''}>${f.sending ? 'Đang gửi…' : 'Gửi yêu cầu'}</button>
+          <button type="button" class="btn btn-primary" data-act="pf-send" data-autofocus ${f.sending || f.file.totalAmount > f.available || !f.packages.length ? App.raw('disabled') : ''}>${f.sending ? 'Đang gửi…' : 'Gửi yêu cầu'}</button>
         </div>
       </div>`;
     }
@@ -1691,6 +1691,7 @@
      Mua bán nợ và Tài trợ hóa đơn cần hóa đơn từ cổng thuế: chưa kết nối thì hiện màn đăng nhập HĐĐT thay cho trang.
      Bản demo điền sẵn tài khoản mẫu và khóa chỉnh sửa, như prototype cổng HĐĐT trước đây. */
   var DEMO_HDDT_ACCOUNT = { username: '0100000001', password: 'demo-pass' };
+  function hddtUsername() { return (App.me && App.me.taxCode) || DEMO_HDDT_ACCOUNT.username; }
   var hddtForm = { busy: false, done: false, error: '' };
   var HDDT_ERRORS = { HDDT_INVALID_CREDENTIALS: 'Tài khoản hoặc mật khẩu hóa đơn điện tử không đúng.' };
 
@@ -1722,7 +1723,7 @@
     hddtForm.busy = true;
     hddtForm.error = '';
     App.paint();
-    api.connectHddt(DEMO_HDDT_ACCOUNT.username, DEMO_HDDT_ACCOUNT.password).then(function () {
+    api.connectHddt(hddtUsername(), DEMO_HDDT_ACCOUNT.password).then(function () {
       hddtForm.busy = false;
       hddtForm.done = true;
       App.paint();
@@ -1757,7 +1758,7 @@
           <h3>Đăng nhập HĐĐT</h3>
           <div class="field">
             <label class="field-label" for="hddt-username">Tài khoản / mã số thuế</label>
-            <input class="input" id="hddt-username" type="text" autocomplete="off" spellcheck="false" readonly value="${DEMO_HDDT_ACCOUNT.username}" ${dis}>
+            <input class="input" id="hddt-username" type="text" autocomplete="off" spellcheck="false" readonly value="${hddtUsername()}" ${dis}>
           </div>
           <div class="field">
             <label class="field-label" for="hddt-password">Mật khẩu</label>

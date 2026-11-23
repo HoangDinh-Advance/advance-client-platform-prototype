@@ -5,12 +5,21 @@
 (function (root) {
   'use strict';
 
-  var STORAGE_KEY = 'advance-client-platform-demo/v9';
+  var STORAGE_KEY = 'advance-client-platform-demo/v10';
   // Ngày "hôm nay" của bản demo được cố định để dữ liệu mẫu ở spec §2 luôn đúng (đến hạn, quá hạn).
   var DEMO_TODAY = '2026-11-12';
   // Trích nợ tự động qua EPAY: tắt từ 17/11. Đổi thành true thì mọi màn và API liên quan trở lại.
   var AUTO_DEBIT_ENABLED = false;
   var DEMO_EMAIL = 'ketoan.mauanphuc@gmail.com';
+  var DEFAULT_RRP_RATE_PCT = 3.19; // mức chiết khấu 30 ngày đã gồm VAT (2,90% chưa VAT) khi khách không có biểu phí riêng
+
+  // Khách hàng test, nạp từ assets/clients.js nếu có: đăng nhập bằng MST của họ thì thấy tên và biểu phí của họ.
+  function demoClients() { return root.ADVANCE_DEMO_CLIENTS || []; }
+  function packagesFor(state, product, defaults) {
+    var fees = state.customer.fees;
+    if (!fees) return defaults.map(function (p) { return { tenorDays: p.tenorDays, feeRateMilli: p.feeRateMilli }; });
+    return (fees[product] || []).map(function (t) { return { tenorDays: t[0], feeRateMilli: t[1] }; });
+  }
   // Hóa đơn (đầu ra và đầu vào) quá số ngày này kể từ ngày hóa đơn thì không chọn được.
   var MAX_INVOICE_AGE_DAYS = 90;
 
@@ -20,17 +29,18 @@
     { code: '970436', short: 'Vietcombank', name: 'Ngân hàng TMCP Ngoại thương Việt Nam', otpLength: 6 }
   ];
   // Gói Invoice Financing: kỳ hạn + mức phí đã gồm VAT 10%, tính theo phần vạn (165 = 1,65%). Số mẫu tự đặt.
+  // Gói phí mặc định khi khách không có biểu phí riêng: kỳ hạn + mức phí đã gồm VAT, tính theo phần nghìn của phần trăm (1650 = 1,65%).
   var IF_PACKAGES = [
-    { tenorDays: 30, feeRateBp: 165 },
-    { tenorDays: 60, feeRateBp: 330 },
-    { tenorDays: 90, feeRateBp: 495 }
+    { tenorDays: 30, feeRateMilli: 1650 },
+    { tenorDays: 60, feeRateMilli: 3300 },
+    { tenorDays: 90, feeRateMilli: 4950 }
   ];
-  function ifFee(amount, feeRateBp) { return Math.floor((amount * feeRateBp + 5000) / 10000); }
+  function ifFee(amount, feeRateMilli) { return Math.floor((amount * feeRateMilli + 50000) / 100000); }
   // Gói Payroll Financing và bảng lương mẫu. Bản demo không đọc nội dung tệp tải lên:
   // tệp nào cũng trả về bảng lương mẫu này. Số mẫu tự đặt.
   var PF_PACKAGES = [
-    { tenorDays: 30, feeRateBp: 165 },
-    { tenorDays: 60, feeRateBp: 330 }
+    { tenorDays: 30, feeRateMilli: 1650 },
+    { tenorDays: 60, feeRateMilli: 3300 }
   ];
   var PAYROLL_SAMPLE = (function () {
     var names = ['Nguyễn Văn An', 'Trần Thị Bình', 'Lê Minh Châu', 'Phạm Quốc Dũng', 'Hoàng Thị Giang', 'Vũ Đức Hải', 'Đặng Thu Hà',
@@ -392,7 +402,7 @@
     return {
       id: request.id, submittedAt: request.submittedAt, supplierNames: suppliers, invoiceCount: request.invoiceIds.length,
       invoiceIds: request.invoiceIds.slice(), totalAmount: invoices.reduce(function (sum, i) { return sum + i.amountIncVat; }, 0),
-      tenorDays: request.tenorDays || null, feeRateBp: request.feeRateBp || null,
+      tenorDays: request.tenorDays || null, feeRateMilli: request.feeRateMilli || null,
       expectedFee: request.expectedFee == null ? null : request.expectedFee, status: request.status
     };
   }
@@ -429,18 +439,26 @@
     return {
       length: otp.length, triesLeft: otp.triesLeft, sendsLeft: OTP_MAX_SENDS - otp.sends,
       expiresInSeconds: Math.max(0, Math.ceil((otp.expiresAt - nowMs()) / 1000)),
-      emailMasked: maskEmail(state.customer.email || DEMO_EMAIL)
+      emailMasked: maskEmail((otp.customer && otp.customer.email) || state.customer.email || DEMO_EMAIL)
     };
   }
 
   route('POST', '/portal/auth/login', function (state, req) {
     var body = req.body || {};
     var email = String(body.email || '').trim().toLowerCase();
-    if (email !== (state.customer.email || DEMO_EMAIL) || digits(body.taxCode) !== state.customer.taxCode) {
+    var taxCode = digits(body.taxCode);
+    // Bản demo không có email đăng ký của khách: nhận mọi email đúng định dạng, MST phải là khách mẫu hoặc khách test.
+    var sample = seed().customer;
+    var client = demoClients().find(function (c) { return c.taxCode === taxCode; });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (taxCode !== sample.taxCode && !client)) {
       return fail(401, 'INVALID_CREDENTIALS', 'Email hoặc mã số thuế không đúng');
     }
+    var customer = client
+      ? Object.assign({}, sample, { name: client.name, shortName: client.shortName, taxCode: client.taxCode, fees: client.fees, rrpRatePct: client.rrpRatePct })
+      : sample;
+    customer.email = email;
     state.session.loggedIn = false;
-    state.session.loginOtp = { length: LOGIN_OTP_LENGTH, triesLeft: OTP_TRIES, sends: 1, expiresAt: nowMs() + state.demo.otpSeconds * 1000 };
+    state.session.loginOtp = { length: LOGIN_OTP_LENGTH, triesLeft: OTP_TRIES, sends: 1, expiresAt: nowMs() + state.demo.otpSeconds * 1000, customer: customer };
     return ok({ status: 'OTP_REQUIRED', otp: loginOtpView(state) });
   }, { pub: true });
 
@@ -457,6 +475,14 @@
       }
       return fail(422, 'OTP_INVALID', 'Mã OTP không đúng.', { triesLeft: pending.triesLeft });
     }
+    // Khách khác đăng nhập: dữ liệu demo về như ban đầu để không lẫn với lượt của khách trước.
+    if (pending.customer.taxCode !== state.customer.taxCode) {
+      var settings = state.demo;
+      var fresh = seed();
+      Object.keys(state).forEach(function (key) { delete state[key]; });
+      Object.assign(state, fresh, { demo: settings });
+    }
+    state.customer = pending.customer;
     state.session.loginOtp = null;
     state.session.loggedIn = true;
     return ok({ name: state.customer.name, taxCode: state.customer.taxCode });
@@ -710,8 +736,9 @@
   // Khoản chiết khấu dự kiến theo RRP-SPEC §1: phân bổ Giá Mua nợ cho hóa đơn đến hạn sớm nhất trước (không quá (3)),
   // chiết khấu chưa VAT = pur_i x mức 30 ngày chưa VAT x tenor_i / 30, VAT 10%, làm tròn nửa lên từng hóa đơn.
   // Ngày mua nợ tạm lấy là hôm nay; số chính thức do Advance chốt trên Phụ lục giao dịch.
-  var RP_FEE_RATE_30_EX_BP = 290; // 2,90% chưa VAT (3,19% đã gồm VAT), số mẫu theo RRP-SPEC
-  function saleDiscount(sale) {
+  function saleDiscount(sale, state) {
+    // Mức 30 ngày đã gồm VAT, theo phần trăm có 2 chữ số lẻ (319 = 3,19%); chưa VAT = mức / 1,1.
+    var rate = Math.round((state.customer.rrpRatePct || DEFAULT_RRP_RATE_PCT) * 100);
     var todayNo = dayNumber(DEMO_TODAY);
     var left = sale.amount;
     var lines = sale.invoices.map(function (i) { return { inv: i, due: addDays(i.issueDate, sale.buyer.paymentTermDays) }; })
@@ -720,7 +747,7 @@
         var purchased = Math.min(left, maxPurchase(x.inv.amountExVat, sale.rate));
         left -= purchased;
         var tenor = Math.max(0, dayNumber(x.due) - todayNo);
-        var exVat = Math.floor((purchased * RP_FEE_RATE_30_EX_BP * tenor + 150000) / 300000);
+        var exVat = Math.floor((2 * purchased * rate * tenor + 330000) / 660000);
         var vat = Math.floor((exVat + 5) / 10);
         return { invoiceNo: x.inv.number, dueDate: x.due, tenorDays: tenor, purchasedAmount: purchased, discountExVat: exVat, vat: vat, discount: exVat + vat };
       });
@@ -735,7 +762,7 @@
   route('POST', '/portal/me/rp/sale-requests/quote', function (state, req) {
     var sale = checkSale(state, req.body || {});
     if (sale.error) return sale.error;
-    var quote = saleDiscount(sale);
+    var quote = saleDiscount(sale, state);
     return ok({ requestedPurchasedAmount: sale.amount, expectedDiscount: quote.discount, expectedDiscountExVat: quote.discountExVat, expectedVat: quote.vat, lines: quote.lines });
   });
 
@@ -747,7 +774,7 @@
     var request = {
       id: nextId(state, 'sale', 'YCBN-'), buyerTaxCode: buyer.taxCode, invoiceIds: ids.slice(),
       appliedRate: rate, requestedPurchasedAmount: amount, maxPurchasedAmount: maxTotal, submittedAt: nowStamp(), status: 'SUBMITTED',
-      expectedDiscount: saleDiscount(sale).discount
+      expectedDiscount: saleDiscount(sale, state).discount
     };
     invoices.forEach(function (i) { i.status = 'REQUESTED'; });
     state.saleRequests.unshift(request);
@@ -762,14 +789,14 @@
     return ok({ suppliers: state.suppliers.map(function (s) { return { taxCode: s.taxCode, name: s.name }; }) });
   });
 
-  route('GET', '/portal/me/if/packages', function () {
-    return ok({ packages: IF_PACKAGES.map(function (p) { return { tenorDays: p.tenorDays, feeRateBp: p.feeRateBp }; }) });
+  route('GET', '/portal/me/if/packages', function (state) {
+    return ok({ packages: packagesFor(state, 'IF', IF_PACKAGES) });
   });
 
   route('POST', '/portal/me/if/requests', function (state, req) {
     if (needHddt(state)) return needHddt(state);
     var ids = Array.isArray((req.body || {}).invoiceIds) ? req.body.invoiceIds : [];
-    var pack = IF_PACKAGES.find(function (p) { return p.tenorDays === Number((req.body || {}).tenorDays); });
+    var pack = packagesFor(state, 'IF', IF_PACKAGES).find(function (p) { return p.tenorDays === Number((req.body || {}).tenorDays); });
     if (!pack) return fail(422, 'PACKAGE_INVALID', 'Gói không hợp lệ.');
     var invoices = ids.map(function (id) { return state.invoices.find(function (i) { return i.id === id && i.direction === 'in'; }); });
     if (!ids.length || invoices.some(function (i) { return !i; })) return fail(422, 'INVOICE_NOT_FOUND', 'Không tìm thấy hóa đơn.');
@@ -780,12 +807,12 @@
     if (invoices.some(overAge)) return fail(422, 'INVOICE_TOO_OLD', 'Có hóa đơn đã quá ' + MAX_INVOICE_AGE_DAYS + ' ngày.');
     var total = invoices.reduce(function (sum, i) { return sum + i.amountIncVat; }, 0);
     var request = {
-      id: nextId(state, 'ifReq', 'YCIF-'), invoiceIds: ids.slice(), tenorDays: pack.tenorDays, feeRateBp: pack.feeRateBp,
-      expectedFee: ifFee(total, pack.feeRateBp), submittedAt: nowStamp(), status: 'SUBMITTED'
+      id: nextId(state, 'ifReq', 'YCIF-'), invoiceIds: ids.slice(), tenorDays: pack.tenorDays, feeRateMilli: pack.feeRateMilli,
+      expectedFee: ifFee(total, pack.feeRateMilli), submittedAt: nowStamp(), status: 'SUBMITTED'
     };
     invoices.forEach(function (i) { i.status = 'REQUESTED'; });
     state.ifRequests.unshift(request);
-    return ok({ id: request.id, status: request.status, invoiceCount: ids.length, tenorDays: request.tenorDays, feeRateBp: request.feeRateBp, expectedFee: request.expectedFee });
+    return ok({ id: request.id, status: request.status, invoiceCount: ids.length, tenorDays: request.tenorDays, feeRateMilli: request.feeRateMilli, expectedFee: request.expectedFee });
   });
 
   route('GET', '/portal/me/if/requests', function (state) {
@@ -800,8 +827,8 @@
     };
   }
 
-  route('GET', '/portal/me/pf/packages', function () {
-    return ok({ packages: PF_PACKAGES.map(function (p) { return { tenorDays: p.tenorDays, feeRateBp: p.feeRateBp }; }) });
+  route('GET', '/portal/me/pf/packages', function (state) {
+    return ok({ packages: packagesFor(state, 'PF', PF_PACKAGES) });
   });
 
   route('POST', '/portal/me/pf/payroll-files', function (state, req) {
@@ -823,15 +850,15 @@
     var file = state.payrollFiles.find(function (f) { return f.id === body.fileId; });
     if (!file) return fail(422, 'PAYROLL_FILE_NOT_FOUND', 'Chưa có bảng lương.');
     if (file.used) return fail(422, 'PAYROLL_FILE_ALREADY_USED', 'Bảng lương này đã được gửi.');
-    var pack = PF_PACKAGES.find(function (p) { return p.tenorDays === Number(body.tenorDays); });
+    var pack = packagesFor(state, 'PF', PF_PACKAGES).find(function (p) { return p.tenorDays === Number(body.tenorDays); });
     if (!pack) return fail(422, 'PACKAGE_INVALID', 'Gói không hợp lệ.');
     if (file.totalAmount > available(state.limits.PF)) {
       return fail(422, 'AMOUNT_OVER_LIMIT', 'Tổng số tiền chi lương vượt quá hạn mức còn lại.', { available: available(state.limits.PF) });
     }
     var request = {
       id: nextId(state, 'pfReq', 'YCPF-'), fileId: file.id, fileName: file.fileName, employeeCount: PAYROLL_SAMPLE.length,
-      totalAmount: file.totalAmount, tenorDays: pack.tenorDays, feeRateBp: pack.feeRateBp,
-      expectedFee: ifFee(file.totalAmount, pack.feeRateBp), submittedAt: nowStamp(), status: 'SUBMITTED'
+      totalAmount: file.totalAmount, tenorDays: pack.tenorDays, feeRateMilli: pack.feeRateMilli,
+      expectedFee: ifFee(file.totalAmount, pack.feeRateMilli), submittedAt: nowStamp(), status: 'SUBMITTED'
     };
     file.used = true;
     state.pfRequests.unshift(request);
