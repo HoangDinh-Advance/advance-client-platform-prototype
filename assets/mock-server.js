@@ -499,7 +499,7 @@
   }, { pub: true });
 
   // ---- Kết nối hóa đơn điện tử. Bản demo không gọi cổng thuế: chỉ nhận tài khoản mẫu bên dưới.
-  var DEMO_HDDT = { password: 'demo-pass' };
+  var DEMO_HDDT = { password: '123456' }; // mật khẩu HĐĐT dùng chung cho bản demo, CS báo cho khách khi test
   function hddtView(state) {
     var h = state.hddt || {};
     return { connected: !!h.connected, account: h.account || null, connectedAt: h.connectedAt || null, lastSyncAt: h.lastSyncAt || null };

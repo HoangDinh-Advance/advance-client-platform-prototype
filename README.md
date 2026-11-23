@@ -11,11 +11,11 @@ Trang tĩnh thuần HTML/CSS/JS, không cần build.
 - Trên máy: `python3 -m http.server 8791` trong thư mục này, rồi mở `http://127.0.0.1:8791/`.
 - GitHub Pages: đẩy nguyên thư mục lên nhánh `main` của một repo, bật Pages ở thư mục gốc (đã có `.nojekyll`).
 
-Đăng nhập bằng email của khách hàng `ketoan.mauanphuc@gmail.com` và MST `0100000001` (điền sẵn), rồi xác thực mã OTP gửi tới email đó. Bản demo không gửi email thật: mã OTP điền sẵn `123456`, nhập đủ 6 số bất kỳ là đúng, toàn số 0 là sai.
+Đăng nhập bằng email và MST của doanh nghiệp (khách mẫu: `ketoan.mauanphuc@gmail.com` / `0100000001`; màn đăng nhập không điền sẵn), rồi xác thực mã OTP gửi tới email đó. Bản demo không gửi email thật: mã OTP điền sẵn `123456`, nhập đủ 6 số bất kỳ là đúng, toàn số 0 là sai.
 
 Biểu phí (Gói của Tài trợ lương, Tài trợ hóa đơn và mức chiết khấu Mua bán nợ) đi theo khách đang đăng nhập. Bản trên GitHub Pages chỉ có khách mẫu với biểu phí mẫu.
 
-Vào **Mua bán nợ** hoặc **Tài trợ hóa đơn** lần đầu sẽ gặp thêm lớp **Đăng nhập HĐĐT** (tài khoản / mã số thuế + mật khẩu hóa đơn điện tử), giống prototype cổng HĐĐT trước đây. Bản demo điền sẵn tài khoản mẫu `0100000001` / `demo-pass` và khóa chỉnh sửa để khách không nhập tài khoản thuế thật; không gọi cổng thuế. Kết nối một lần dùng chung cho cả hai sản phẩm, giữ đến khi bấm Ngắt kết nối hoặc Đặt lại demo.
+Vào **Mua bán nợ** hoặc **Tài trợ hóa đơn** lần đầu sẽ gặp thêm lớp **Đăng nhập HĐĐT** (tài khoản / mã số thuế + mật khẩu hóa đơn điện tử), giống prototype cổng HĐĐT trước đây. Khách tự nhập MST của doanh nghiệp mình (hoặc tài khoản con dạng MST-U001) và mật khẩu demo `123456`; bản demo không gọi cổng thuế và không giữ mật khẩu. Kết nối một lần dùng chung cho cả hai sản phẩm, giữ đến khi bấm Ngắt kết nối hoặc Đặt lại demo.
 
 | Phần | Địa chỉ |
 |---|---|

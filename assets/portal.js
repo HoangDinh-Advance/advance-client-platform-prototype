@@ -98,11 +98,11 @@
         <form data-submit="login" novalidate autocomplete="off">
           <div class="field">
             <label class="field-label" for="login-email">Email</label>
-            <input class="input" id="login-email" data-keep="1" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" value="ketoan.mauanphuc@gmail.com" ${st.busy ? App.raw('disabled') : ''}>
+            <input class="input" id="login-email" data-keep="1" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Email của doanh nghiệp" ${st.busy ? App.raw('disabled') : ''}>
           </div>
           <div class="field">
             <label class="field-label" for="login-tax">Mã số thuế</label>
-            <input class="input" id="login-tax" data-keep="1" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="0100000001" ${st.busy ? App.raw('disabled') : ''}>
+            <input class="input" id="login-tax" data-keep="1" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="Mã số thuế của doanh nghiệp" ${st.busy ? App.raw('disabled') : ''}>
           </div>
           <p class="form-message" role="alert">${st.error}</p>
           <button type="submit" class="btn btn-primary btn-block" ${st.busy ? App.raw('disabled') : ''}>${st.busy ? 'Đang gửi mã OTP…' : 'Tiếp tục'}</button>
@@ -1690,10 +1690,9 @@
   /* ================================================================== Kết nối hóa đơn điện tử
      Mua bán nợ và Tài trợ hóa đơn cần hóa đơn từ cổng thuế: chưa kết nối thì hiện màn đăng nhập HĐĐT thay cho trang.
      Bản demo điền sẵn tài khoản mẫu và khóa chỉnh sửa, như prototype cổng HĐĐT trước đây. */
-  var DEMO_HDDT_ACCOUNT = { username: '0100000001', password: 'demo-pass' };
-  function hddtUsername() { return (App.me && App.me.taxCode) || DEMO_HDDT_ACCOUNT.username; }
-  var hddtForm = { busy: false, done: false, error: '' };
+  var hddtForm = { busy: false, done: false, error: '', errorField: '' };
   var HDDT_ERRORS = { HDDT_INVALID_CREDENTIALS: 'Tài khoản hoặc mật khẩu hóa đơn điện tử không đúng.' };
+  var HDDT_ERROR_FIELD = { FIELDS_REQUIRED: '', USERNAME_FORMAT: 'hddt-username', HDDT_NOT_OWN: 'hddt-username', HDDT_INVALID_CREDENTIALS: 'hddt-password' };
 
   function gateWithHddt(view, title, copy) {
     var load = view.load, render = view.render, onData = view.onData, hasBar = view.hasBar, renderBar = view.renderBar;
@@ -1720,10 +1719,24 @@
 
   function connectHddt() {
     if (hddtForm.busy || hddtForm.done) return;
+    var userEl = document.getElementById('hddt-username');
+    var passEl = document.getElementById('hddt-password');
+    var username = userEl.value.trim();
+    var password = passEl.value;
+    if (!username || !password) {
+      hddtForm.error = 'Nhập đủ tài khoản và mật khẩu.';
+      hddtForm.errorField = !username ? 'hddt-username' : 'hddt-password';
+      App.paint();
+      focusHddtField();
+      return;
+    }
+    // Mật khẩu chỉ nằm trong lần gọi này, không giữ lại trên trang.
+    passEl.value = '';
     hddtForm.busy = true;
     hddtForm.error = '';
+    hddtForm.errorField = '';
     App.paint();
-    api.connectHddt(hddtUsername(), DEMO_HDDT_ACCOUNT.password).then(function () {
+    api.connectHddt(username, password).then(function () {
       hddtForm.busy = false;
       hddtForm.done = true;
       App.paint();
@@ -1734,8 +1747,14 @@
       hddtForm.busy = false;
       hddtForm.done = false;
       hddtForm.error = HDDT_ERRORS[error.code] || error.message;
+      hddtForm.errorField = HDDT_ERROR_FIELD[error.code] || '';
       App.paint();
+      focusHddtField();
     });
+  }
+  function focusHddtField() {
+    var el = document.getElementById(hddtForm.errorField || 'hddt-username');
+    if (el) el.focus();
   }
 
   function hddtGateHtml(title, copy) {
@@ -1758,11 +1777,11 @@
           <h3>Đăng nhập HĐĐT</h3>
           <div class="field">
             <label class="field-label" for="hddt-username">Tài khoản / mã số thuế</label>
-            <input class="input" id="hddt-username" type="text" autocomplete="off" spellcheck="false" readonly value="${hddtUsername()}" ${dis}>
+            <input class="input" id="hddt-username" data-keep="1" type="text" autocomplete="off" spellcheck="false" placeholder="Nhập tài khoản hóa đơn điện tử" aria-invalid="${f.errorField === 'hddt-username' ? 'true' : 'false'}" ${dis}>
           </div>
           <div class="field">
             <label class="field-label" for="hddt-password">Mật khẩu</label>
-            <input class="input" id="hddt-password" type="password" autocomplete="off" readonly value="${DEMO_HDDT_ACCOUNT.password}" ${dis}>
+            <input class="input" id="hddt-password" type="password" autocomplete="new-password" placeholder="Nhập mật khẩu" aria-invalid="${f.errorField === 'hddt-password' ? 'true' : 'false'}" ${dis}>
           </div>
           <p class="form-message ${f.error ? '' : 'is-status'}" role="${f.error ? 'alert' : 'status'}" aria-live="polite">${status || ''}</p>
           <button type="submit" class="btn btn-primary btn-block" ${dis}>Đăng nhập</button>

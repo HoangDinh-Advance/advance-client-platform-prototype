@@ -155,7 +155,7 @@
       pending: 'Yêu cầu đang chờ Advance xử lý', none: 'Chưa có yêu cầu nào đang chờ.',
       cancelRequest: 'Yêu cầu hủy ủy quyền', saleRequest: 'Yêu cầu bán nợ',
       approve: 'Advance duyệt', reject: 'Advance từ chối', reason: 'Lý do từ chối (bắt buộc)', reasonMissing: 'Vui lòng nhập lý do từ chối.',
-      otpRule: 'Mã OTP: nhập đủ số ký tự bất kỳ là đúng, nhập toàn số 0 là sai.',
+      otpRule: 'Mã OTP: nhập đủ số ký tự bất kỳ là đúng, nhập toàn số 0 là sai. Mật khẩu HĐĐT: 123456.',
       hintLead: 'Thông tin đăng ký đúng trên B2B:', hintAgreement: 'Mã hợp đồng', hintPhone: 'SĐT', hintAccount: 'Tài khoản Giao dịch',
       reset: 'Đặt lại demo', other: 'Mở B2B (nội bộ Advance)', otherRoute: 'b2b-loans'
     },
