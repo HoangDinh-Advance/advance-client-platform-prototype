@@ -1695,7 +1695,7 @@
   var hddtForm = { busy: false, done: false, error: '' };
   var HDDT_ERRORS = { HDDT_INVALID_CREDENTIALS: 'Tài khoản hoặc mật khẩu hóa đơn điện tử không đúng.' };
 
-  function gateWithHddt(view, title) {
+  function gateWithHddt(view, title, copy) {
     var load = view.load, render = view.render, onData = view.onData, hasBar = view.hasBar, renderBar = view.renderBar;
     function gated(v) { return !!(v.data && v.data.hddtGate); }
     view.load = function () {
@@ -1709,7 +1709,7 @@
     view.hasBar = function () { return !gated(this) && hasBar.call(this); };
     view.renderBar = function () { return gated(this) ? '' : renderBar.call(this); };
     view.render = function () {
-      if (gated(this)) return hddtGateHtml(title);
+      if (gated(this)) return hddtGateHtml(title, copy);
       return render.call(this);
     };
     view.actions['hddt-connect'] = connectHddt;
@@ -1738,7 +1738,7 @@
     });
   }
 
-  function hddtGateHtml(title) {
+  function hddtGateHtml(title, copy) {
     var f = hddtForm;
     var status = f.done ? 'Đã đăng nhập. Đang tải hóa đơn…' : f.busy ? 'Đang đăng nhập cổng hóa đơn điện tử…' : f.error;
     var dis = f.busy || f.done ? App.raw('disabled') : '';
@@ -1747,11 +1747,11 @@
         <div class="hddt-intro">
           <div class="eyebrow">Hóa đơn điện tử</div>
           <h2 id="hddt-title">Kết nối tài khoản hóa đơn điện tử</h2>
-          <p>Kết nối một lần, hệ thống tự lấy hóa đơn đầu ra và đầu vào từ cổng hóa đơn điện tử. Quý khách không cần gửi hóa đơn qua email.</p>
+          <p>${copy.lead}</p>
           <ol class="hddt-steps">
             <li><span class="step-number">01</span>Đăng nhập tài khoản hóa đơn điện tử</li>
-            <li><span class="step-number">02</span>Hệ thống lấy hóa đơn đầu ra và đầu vào</li>
-            <li><span class="step-number">03</span>Chọn hóa đơn để bán hoặc đề nghị tài trợ</li>
+            <li><span class="step-number">02</span>${copy.step2}</li>
+            <li><span class="step-number">03</span>${copy.step3}</li>
           </ol>
         </div>
         <form class="hddt-form" data-submit="hddt-connect" novalidate autocomplete="off">
@@ -1777,6 +1777,14 @@
       <button type="button" class="text-button" data-act="hddt-disconnect">Ngắt kết nối</button></div>`;
   }
 
-  gateWithHddt(rp, 'Mua bán nợ');
-  gateWithHddt(invf, 'Tài trợ hóa đơn');
+  gateWithHddt(rp, 'Mua bán nợ', {
+    lead: 'Kết nối một lần, hệ thống lấy hóa đơn đầu ra từ cổng hóa đơn điện tử. Quý khách không cần gửi hóa đơn qua email.',
+    step2: 'Hệ thống lấy hóa đơn đầu ra',
+    step3: 'Chọn hóa đơn để bán'
+  });
+  gateWithHddt(invf, 'Tài trợ hóa đơn', {
+    lead: 'Kết nối một lần, hệ thống tự lấy hóa đơn đầu vào từ cổng hóa đơn điện tử. Quý khách không cần gửi hóa đơn qua email.',
+    step2: 'Hệ thống lấy hóa đơn đầu vào',
+    step3: 'Chọn hóa đơn để tài trợ'
+  });
 })();
