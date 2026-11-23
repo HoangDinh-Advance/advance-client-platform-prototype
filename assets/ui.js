@@ -87,6 +87,38 @@
     setTimeout(function () { item.remove(); }, 6000);
   }
 
+  /* ------------------------------------------------------------------ tải file */
+  var scriptLoads = {};
+  function loadScript(src) {
+    if (!scriptLoads[src]) {
+      scriptLoads[src] = new Promise(function (resolve, reject) {
+        var el = document.createElement('script');
+        el.src = src;
+        el.onload = resolve;
+        el.onerror = function () { delete scriptLoads[src]; reject(new Error('load')); };
+        document.head.appendChild(el);
+      });
+    }
+    return scriptLoads[src];
+  }
+
+  // Trong artifact claude.ai, link tải bị chặn: phải đi qua quyền downloads (người xem xác nhận lưu file).
+  function saveFile(filename, blob) {
+    var host = window.claude && typeof window.claude.use === 'function' ? window.claude.use('downloads') : Promise.resolve(null);
+    return host.then(function (downloads) {
+      if (downloads) return downloads.save({ filename: filename, data: blob }).then(function () { return 'saved'; });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      return 'saved';
+    });
+  }
+
   /* ------------------------------------------------------------------ khung trang */
   function brand(href) {
     return html`<a class="brand" href="#${href}" aria-label="Bridge Finance">
@@ -455,6 +487,8 @@
   App.authTag = authTag;
   App.AUTH_STATUS = AUTH_STATUS;
   App.toast = toast;
+  App.loadScript = loadScript;
+  App.saveFile = saveFile;
   App.paint = paint;
   App.paintDialog = paintDialog;
   App.openDialog = openDialog;

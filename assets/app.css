@@ -120,6 +120,9 @@ textarea.input { height: auto; min-height: 76px; resize: vertical; line-height: 
 .metric-value small { font-size: 12px; font-weight: 450; color: var(--muted); letter-spacing: 0; }
 
 .sale-tabs { display: flex; gap: 1.5rem; border-bottom: 1px solid var(--line); padding: 0 1.25rem; overflow-x: auto; overflow-y: hidden; }
+.tabs-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 1rem; border-bottom: 1px solid var(--line); padding-right: 1.25rem; }
+.tabs-bar .sale-tabs { border-bottom: 0; flex: 1 1 auto; min-width: 0; }
+.tabs-bar > .btn { margin-left: auto; }
 .sale-tab { border: 0; background: transparent; padding: 0.95rem 0 0.8rem; color: var(--muted); font-size: 12px; position: relative; white-space: nowrap; }
 .sale-tab span { font-size: 10px; display: inline-block; min-width: 19px; padding: 1px 5px; border-radius: 4px; background: #f0f3ef; margin-left: 5px; text-align: center; }
 .sale-tab[aria-selected="true"] { color: var(--brand); font-weight: 650; }

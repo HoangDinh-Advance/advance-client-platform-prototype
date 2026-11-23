@@ -27,6 +27,11 @@
   }
   // (3) = (1) x (2), làm tròn nửa lên đến đồng, theo từng hóa đơn.
   function maxPurchase(amountExVat, ratePercent) { return Math.floor((amountExVat * ratePercent + 50) / 100); }
+  // Gói mặc định là 30 ngày; khách không có gói 30 ngày thì lấy gói đầu tiên.
+  function defaultTenor(packages) {
+    if (!packages.length) return null;
+    return packages.some(function (p) { return p.tenorDays === 30; }) ? 30 : packages[0].tenorDays;
+  }
   function accountText(account) { return account ? account.bankName + ' · ' + account.accountNo : '(chưa có)'; }
 
   /* ================================================================== S1. Đăng nhập */
@@ -180,13 +185,59 @@
   };
 
   /* ================================================================== S2. Tổng quan */
+  var SHEETJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  function payParty(r) { return r.payer === 'BUYER' ? r.buyerName + ' · ' + r.invoiceNo : 'Quý khách'; }
+  function paidFileName(d) { return 'Da-thanh-toan_' + App.me.taxCode + '_' + d.today.replace(/-/g, '') + '.xlsx'; }
+  function paidWorkbook(d) {
+    var XLSX = window.XLSX;
+    var head = ['Mã giao dịch', 'Sản phẩm', 'Bên thanh toán / Hóa đơn', 'Ngày đến hạn', 'Ngày thanh toán', 'Số tiền tài trợ (VND)', 'Số tiền đã trả (VND)'];
+    var rows = [
+      ['DANH SÁCH KHOẢN ĐÃ THANH TOÁN'],
+      ['Doanh nghiệp', App.me.name],
+      ['Mã số thuế', App.me.taxCode],
+      ['Ngày xuất', fmt.vnDate(d.today)],
+      [],
+      head
+    ];
+    var first = rows.length;
+    d.paid.forEach(function (r) {
+      rows.push([r.loanId, PRODUCT[r.product], payParty(r), fmt.vnDate(r.dueDate), fmt.vnDate(r.paidDate), r.financedAmount, r.paidAmount]);
+    });
+    var ws = XLSX.utils.aoa_to_sheet(rows);
+    for (var i = first; i < rows.length; i++) {
+      ['F', 'G'].forEach(function (col) { ws[col + (i + 1)].z = '#,##0'; });
+    }
+    ws['!cols'] = [{ wch: 16 }, { wch: 18 }, { wch: 36 }, { wch: 14 }, { wch: 16 }, { wch: 22 }, { wch: 22 }];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Đã thanh toán');
+    var out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    return new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  }
+
   var overview = App.views['tong-quan'] = {
     mode: 'portal', nav: 'tong-quan',
-    state: { tab: 'due' },
-    reset: function () { this.state = { tab: 'due' }; },
+    state: { tab: 'due', exporting: false },
+    reset: function () { this.state = { tab: 'due', exporting: false }; },
     load: function () { return api.getOverview(); },
     actions: {
-      'ov-tab': function (el) { overview.state.tab = el.getAttribute('data-tab'); App.paint(); }
+      'ov-tab': function (el) { overview.state.tab = el.getAttribute('data-tab'); App.paint(); },
+      'ov-export': function () {
+        var st = overview.state;
+        if (st.exporting) return;
+        st.exporting = true;
+        App.paint();
+        App.loadScript(SHEETJS_URL).then(function () {
+          return App.saveFile(paidFileName(overview.data), paidWorkbook(overview.data));
+        }).then(function () {
+          App.toast('Đã tải file Excel.');
+        }).catch(function (error) {
+          if (error && error.code === 'declined') return;
+          App.toast('Không tải được file Excel. Vui lòng thử lại.', true);
+        }).then(function () {
+          st.exporting = false;
+          App.paint();
+        });
+      }
     },
     render: function () {
       var d = this.data;
@@ -208,7 +259,7 @@
       });
 
       // Bên thanh toán + hóa đơn: Mua bán nợ là Bên thanh toán của hóa đơn, các sản phẩm khác là chính khách hàng.
-      function party(r) { return r.payer === 'BUYER' ? r.buyerName + ' · ' + r.invoiceNo : 'Quý khách'; }
+      var party = payParty;
 
       var table;
       if (tab === 'paid') {
@@ -263,9 +314,15 @@
       return html`<div class="page-head"><h1>Tổng quan</h1></div>
         <section class="limit-grid" aria-label="Hạn mức theo sản phẩm">${cards}</section>
         <section class="card" aria-label="Lịch thanh toán">
-          <div class="sale-tabs" role="tablist" aria-label="Lịch thanh toán">
-            <button type="button" role="tab" class="sale-tab" data-act="ov-tab" data-tab="due" aria-selected="${tab === 'due' ? 'true' : 'false'}">Lịch thanh toán<span>${d.schedule.length}</span></button>
-            <button type="button" role="tab" class="sale-tab" data-act="ov-tab" data-tab="paid" aria-selected="${tab === 'paid' ? 'true' : 'false'}">Đã thanh toán<span>${d.paid.length}</span></button>
+          <div class="tabs-bar">
+            <div class="sale-tabs" role="tablist" aria-label="Lịch thanh toán">
+              <button type="button" role="tab" class="sale-tab" data-act="ov-tab" data-tab="due" aria-selected="${tab === 'due' ? 'true' : 'false'}">Lịch thanh toán<span>${d.schedule.length}</span></button>
+              <button type="button" role="tab" class="sale-tab" data-act="ov-tab" data-tab="paid" aria-selected="${tab === 'paid' ? 'true' : 'false'}">Đã thanh toán<span>${d.paid.length}</span></button>
+            </div>
+            ${tab === 'paid' && html`<button type="button" class="btn btn-outline btn-sm" data-act="ov-export" ${this.state.exporting || !d.paid.length ? App.raw('disabled') : ''}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+              ${this.state.exporting ? 'Đang tạo file…' : 'Tải file Excel'}
+            </button>`}
           </div>
           <div class="table-wrap" id="schedule-wrap">${table}</div>
         </section>
@@ -1400,7 +1457,7 @@
         var items = ifSelected();
         invf.state.confirm = {
           step: 'confirm', items: items, total: items.reduce(function (s, i) { return s + i.amountIncVat; }, 0),
-          available: invf.data.limit.available, packages: invf.data.packages, tenorDays: invf.data.packages.length ? invf.data.packages[0].tenorDays : null,
+          available: invf.data.limit.available, packages: invf.data.packages, tenorDays: defaultTenor(invf.data.packages),
           sending: false, error: '', result: null
         };
         App.openDialog({ render: ifDialogHtml, locked: function () { return invf.state.confirm && invf.state.confirm.sending; } });
@@ -1558,7 +1615,7 @@
       'pf-open': function () {
         pf.state.flow = {
           step: 'upload', file: null, uploading: false, error: '', packages: pf.data.packages,
-          tenorDays: pf.data.packages.length ? pf.data.packages[0].tenorDays : null, available: pf.data.limit.available, sending: false, result: null
+          tenorDays: defaultTenor(pf.data.packages), available: pf.data.limit.available, sending: false, result: null
         };
         App.openDialog({ render: pfDialogHtml, locked: function () { var f = pf.state.flow; return f && (f.sending || f.uploading); } });
       },
