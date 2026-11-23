@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
 
-  var STORAGE_KEY = 'advance-client-platform-demo/v8';
+  var STORAGE_KEY = 'advance-client-platform-demo/v9';
   // Ngày "hôm nay" của bản demo được cố định để dữ liệu mẫu ở spec §2 luôn đúng (đến hạn, quá hạn).
   var DEMO_TODAY = '2026-11-12';
   // Trích nợ tự động qua EPAY: tắt từ 17/11. Đổi thành true thì mọi màn và API liên quan trở lại.
@@ -54,6 +54,8 @@
     return {
       version: 1,
       session: { loggedIn: false },
+      // Kết nối tài khoản hóa đơn điện tử (cổng thuế). Mua bán nợ và Tài trợ hóa đơn chỉ mở khi đã kết nối.
+      hddt: { connected: false, account: null, connectedAt: null, lastSyncAt: null },
       demo: { registerResult: 'ok', otpSeconds: 120, debitResult: 'ok' },
       seq: { sale: 0, ifReq: 0, pfReq: 0, pfFile: 0, cancel: 0, auth: 1, order: 0, loan: 3 },
       customer: {
@@ -470,6 +472,35 @@
     return ok({ status: 'OTP_REQUIRED', otp: loginOtpView(state) });
   }, { pub: true });
 
+  // ---- Kết nối hóa đơn điện tử. Bản demo không gọi cổng thuế: chỉ nhận tài khoản mẫu bên dưới.
+  var DEMO_HDDT = { password: 'demo-pass' };
+  function hddtView(state) {
+    var h = state.hddt || {};
+    return { connected: !!h.connected, account: h.account || null, connectedAt: h.connectedAt || null, lastSyncAt: h.lastSyncAt || null };
+  }
+  function needHddt(state) {
+    return state.hddt && state.hddt.connected ? null : fail(409, 'HDDT_NOT_CONNECTED', 'Chưa kết nối tài khoản hóa đơn điện tử.');
+  }
+
+  route('GET', '/portal/me/hddt', function (state) { return ok(hddtView(state)); });
+
+  route('POST', '/portal/me/hddt/connect', function (state, req) {
+    var body = req.body || {};
+    var username = String(body.username || '').trim();
+    if (!username || !body.password) return fail(422, 'FIELDS_REQUIRED', 'Nhập đủ tài khoản và mật khẩu.');
+    if (!/^\d{10}(\d{3})?(-U\d{3})?$/i.test(username)) return fail(422, 'USERNAME_FORMAT', 'Tài khoản HĐĐT phải là mã số thuế hoặc tài khoản con dạng MST-U001.');
+    if (username.split('-')[0] !== state.customer.taxCode) return fail(422, 'HDDT_NOT_OWN', 'Tài khoản HĐĐT không thuộc doanh nghiệp đang đăng nhập.');
+    if (body.password !== DEMO_HDDT.password) return fail(401, 'HDDT_INVALID_CREDENTIALS', 'Tài khoản hoặc mật khẩu hóa đơn điện tử không đúng.');
+    var stamp = nowStamp();
+    state.hddt = { connected: true, account: username.toUpperCase(), connectedAt: stamp, lastSyncAt: stamp };
+    return ok(hddtView(state));
+  });
+
+  route('POST', '/portal/me/hddt/disconnect', function (state) {
+    state.hddt = { connected: false, account: null, connectedAt: null, lastSyncAt: null };
+    return ok(hddtView(state));
+  });
+
   route('POST', '/portal/auth/logout', function (state) {
     state.session.loggedIn = false;
     return ok({});
@@ -631,6 +662,7 @@
   });
 
   route('GET', '/portal/me/invoices', function (state, req) {
+    if (needHddt(state)) return needHddt(state);
     var q = req.query;
     var direction = q.direction === 'in' ? 'in' : 'out';
     var items = state.invoices.filter(function (i) {
@@ -654,6 +686,7 @@
 
   // Kiểm tra một yêu cầu bán nợ, dùng chung cho tính chiết khấu dự kiến và gửi yêu cầu.
   function checkSale(state, body) {
+    if (needHddt(state)) return { error: needHddt(state) };
     var ids = Array.isArray(body.invoiceIds) ? body.invoiceIds : [];
     var buyer = buyerBy(state, body.buyerTaxCode);
     if (!buyer) return { error: fail(422, 'BUYER_NOT_WHITELISTED', 'Bên thanh toán không thuộc danh sách được chấp nhận.') };
@@ -734,6 +767,7 @@
   });
 
   route('POST', '/portal/me/if/requests', function (state, req) {
+    if (needHddt(state)) return needHddt(state);
     var ids = Array.isArray((req.body || {}).invoiceIds) ? req.body.invoiceIds : [];
     var pack = IF_PACKAGES.find(function (p) { return p.tenorDays === Number((req.body || {}).tenorDays); });
     if (!pack) return fail(422, 'PACKAGE_INVALID', 'Gói không hợp lệ.');

@@ -331,7 +331,7 @@
       var d = this.data;
       if (!d) return html`<div class="page-head"><h1>Mua bán nợ</h1></div>${loadingCard()}`;
       if (showChooser(d)) return chooserHtml();
-      return html`<div class="page-head"><h1>Mua bán nợ</h1></div>
+      return html`<div class="page-head"><h1>Mua bán nợ</h1>${hddtStatusHtml(d)}</div>
         ${whitelistHtml(d)}
         ${invoicesHtml(d)}
         ${historyHtml(d)}`;
@@ -1335,7 +1335,7 @@
           <td><span class="tag ${status.cls}">${status.label}</span></td>
         </tr>`;
       });
-      return html`<div class="page-head"><h1>Tài trợ hóa đơn</h1></div>
+      return html`<div class="page-head"><h1>Tài trợ hóa đơn</h1>${hddtStatusHtml(d)}</div>
         <section class="card" aria-labelledby="if-suppliers-title">
           <div class="card-head"><h2 id="if-suppliers-title">Danh sách Nhà cung cấp được chấp thuận</h2></div>
           <div class="table-wrap" id="if-suppliers-wrap">
@@ -1686,4 +1686,96 @@
       </div>
     </div>`;
   }
+
+  /* ================================================================== Kết nối hóa đơn điện tử
+     Mua bán nợ và Tài trợ hóa đơn cần hóa đơn từ cổng thuế: chưa kết nối thì hiện màn đăng nhập HĐĐT thay cho trang.
+     Bản demo điền sẵn tài khoản mẫu và khóa chỉnh sửa, như prototype cổng HĐĐT trước đây. */
+  var DEMO_HDDT_ACCOUNT = { username: '0100000001', password: 'demo-pass' };
+  var hddtForm = { busy: false, done: false, error: '' };
+  var HDDT_ERRORS = { HDDT_INVALID_CREDENTIALS: 'Tài khoản hoặc mật khẩu hóa đơn điện tử không đúng.' };
+
+  function gateWithHddt(view, title) {
+    var load = view.load, render = view.render, onData = view.onData, hasBar = view.hasBar, renderBar = view.renderBar;
+    function gated(v) { return !!(v.data && v.data.hddtGate); }
+    view.load = function () {
+      var self = this;
+      return api.getHddt().then(function (h) {
+        if (!h.connected) return { hddtGate: true, hddt: h };
+        return load.call(self).then(function (d) { d.hddt = h; return d; });
+      });
+    };
+    view.onData = function () { if (!gated(this) && onData) onData.call(this); };
+    view.hasBar = function () { return !gated(this) && hasBar.call(this); };
+    view.renderBar = function () { return gated(this) ? '' : renderBar.call(this); };
+    view.render = function () {
+      if (gated(this)) return hddtGateHtml(title);
+      return render.call(this);
+    };
+    view.actions['hddt-connect'] = connectHddt;
+    view.actions['hddt-disconnect'] = function () {
+      App.run(api.disconnectHddt().then(function () { App.toast('Đã ngắt kết nối hóa đơn điện tử.'); return App.refresh(); }));
+    };
+  }
+
+  function connectHddt() {
+    if (hddtForm.busy || hddtForm.done) return;
+    hddtForm.busy = true;
+    hddtForm.error = '';
+    App.paint();
+    api.connectHddt(DEMO_HDDT_ACCOUNT.username, DEMO_HDDT_ACCOUNT.password).then(function () {
+      hddtForm.busy = false;
+      hddtForm.done = true;
+      App.paint();
+      return App.refresh();
+    }).then(function () {
+      hddtForm.done = false;
+    }).catch(function (error) {
+      hddtForm.busy = false;
+      hddtForm.done = false;
+      hddtForm.error = HDDT_ERRORS[error.code] || error.message;
+      App.paint();
+    });
+  }
+
+  function hddtGateHtml(title) {
+    var f = hddtForm;
+    var status = f.done ? 'Đã đăng nhập. Đang tải hóa đơn…' : f.busy ? 'Đang đăng nhập cổng hóa đơn điện tử…' : f.error;
+    var dis = f.busy || f.done ? App.raw('disabled') : '';
+    return html`<div class="page-head"><h1>${title}</h1></div>
+      <section class="card hddt-gate" aria-labelledby="hddt-title">
+        <div class="hddt-intro">
+          <div class="eyebrow">Hóa đơn điện tử</div>
+          <h2 id="hddt-title">Kết nối tài khoản hóa đơn điện tử</h2>
+          <p>Kết nối một lần, hệ thống tự lấy hóa đơn đầu ra và đầu vào từ cổng hóa đơn điện tử. Quý khách không cần gửi hóa đơn qua email.</p>
+          <ol class="hddt-steps">
+            <li><span class="step-number">01</span>Đăng nhập tài khoản hóa đơn điện tử</li>
+            <li><span class="step-number">02</span>Hệ thống lấy hóa đơn đầu ra và đầu vào</li>
+            <li><span class="step-number">03</span>Chọn hóa đơn để bán hoặc đề nghị tài trợ</li>
+          </ol>
+        </div>
+        <form class="hddt-form" data-submit="hddt-connect" novalidate autocomplete="off">
+          <h3>Đăng nhập HĐĐT</h3>
+          <div class="field">
+            <label class="field-label" for="hddt-username">Tài khoản / mã số thuế</label>
+            <input class="input" id="hddt-username" type="text" autocomplete="off" spellcheck="false" readonly value="${DEMO_HDDT_ACCOUNT.username}" ${dis}>
+          </div>
+          <div class="field">
+            <label class="field-label" for="hddt-password">Mật khẩu</label>
+            <input class="input" id="hddt-password" type="password" autocomplete="off" readonly value="${DEMO_HDDT_ACCOUNT.password}" ${dis}>
+          </div>
+          <p class="form-message ${f.error ? '' : 'is-status'}" role="${f.error ? 'alert' : 'status'}" aria-live="polite">${status || ''}</p>
+          <button type="submit" class="btn btn-primary btn-block" ${dis}>Đăng nhập</button>
+        </form>
+      </section>`;
+  }
+
+  function hddtStatusHtml(d) {
+    var h = d && d.hddt;
+    if (!h || !h.connected) return '';
+    return html`<div class="hddt-status"><span class="tag tag-ok">Đã kết nối HĐĐT</span><span class="mono">${h.account}</span><span>Cập nhật ${fmt.vnDateTime(h.lastSyncAt)}</span>
+      <button type="button" class="text-button" data-act="hddt-disconnect">Ngắt kết nối</button></div>`;
+  }
+
+  gateWithHddt(rp, 'Mua bán nợ');
+  gateWithHddt(invf, 'Tài trợ hóa đơn');
 })();

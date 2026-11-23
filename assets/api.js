@@ -15,7 +15,7 @@
   ApiError.prototype = Object.create(Error.prototype);
 
   var LATENCY_MS = 350;
-  var SLOW = { 'POST /portal/me/rp/debit-auth': 1200, 'POST /portal/me/pf/payroll-files': 1000, 'POST /portal/me/rp/sale-requests/quote': 150 };
+  var SLOW = { 'POST /portal/me/rp/debit-auth': 1200, 'POST /portal/me/pf/payroll-files': 1000, 'POST /portal/me/rp/sale-requests/quote': 150, 'POST /portal/me/hddt/connect': 1800 };
 
   /* Mock transport. Bản thật: return fetch(BASE_URL + path, { method, headers, body: JSON.stringify(body) }) ... */
   function transport(method, path, body) {
@@ -66,6 +66,9 @@
     createSaleRequest: function (payload) { return transport('POST', '/portal/me/rp/sale-requests', payload); },
     getSaleRequests: function () { return transport('GET', '/portal/me/rp/sale-requests'); },
     getIfSuppliers: function () { return transport('GET', '/portal/me/if/suppliers'); },
+    getHddt: function () { return transport('GET', '/portal/me/hddt'); },
+    connectHddt: function (username, password) { return transport('POST', '/portal/me/hddt/connect', { username: username, password: password }); },
+    disconnectHddt: function () { return transport('POST', '/portal/me/hddt/disconnect'); },
     getPfPackages: function () { return transport('GET', '/portal/me/pf/packages'); },
     uploadPayrollFile: function (file) { return transport('POST', '/portal/me/pf/payroll-files', { fileName: file.fileName, fileSize: file.fileSize }); },
     createPfRequest: function (fileId, tenorDays) { return transport('POST', '/portal/me/pf/requests', { fileId: fileId, tenorDays: tenorDays }); },
