@@ -94,10 +94,8 @@
     return {
       version: 1,
       session: { loggedIn: false },
-      // Kết nối tài khoản hóa đơn điện tử (cổng thuế). Mua bán nợ và Tài trợ hóa đơn chỉ mở khi đã kết nối.
+      // Kết nối tài khoản hóa đơn điện tử (cổng thuế): một lần đăng nhập mở Mua bán nợ, Tài trợ hóa đơn và Tài trợ lương.
       hddt: { connected: false, account: null, connectedAt: null, lastSyncAt: null },
-      // Đăng nhập Tài trợ lương bằng MST + mật khẩu: chỉ để dùng sản phẩm lương, không lấy hóa đơn, tách khỏi kết nối HĐĐT.
-      pfAccess: { loggedIn: false, account: null, loggedInAt: null },
       demo: { registerResult: 'ok', otpSeconds: 120, debitResult: 'ok' },
       seq: { sale: 0, ifReq: 0, pfReq: 0, pfFile: 0, cancel: 0, auth: 1, order: 0, loan: 3 },
       customer: {
@@ -531,7 +529,7 @@
   }, { pub: true });
 
   // ---- Kết nối hóa đơn điện tử. Bản demo không gọi cổng thuế: chỉ nhận tài khoản mẫu bên dưới.
-  var DEMO_HDDT = { password: '123456' }; // mật khẩu demo của HĐĐT và đăng nhập Tài trợ lương, CS báo cho khách khi test
+  var DEMO_HDDT = { password: '123456' }; // mật khẩu HĐĐT của bản demo, CS báo cho khách khi test
   function hddtView(state) {
     var h = state.hddt || {};
     return { connected: !!h.connected, account: h.account || null, connectedAt: h.connectedAt || null, lastSyncAt: h.lastSyncAt || null };
@@ -552,27 +550,6 @@
     var stamp = nowStamp();
     state.hddt = { connected: true, account: username.toUpperCase(), connectedAt: stamp, lastSyncAt: stamp };
     return ok(hddtView(state));
-  });
-
-  function pfAccessView(state) {
-    var a = state.pfAccess || {};
-    return { loggedIn: !!a.loggedIn, account: a.account || null, loggedInAt: a.loggedInAt || null };
-  }
-  function needPfAccess(state) {
-    return state.pfAccess && state.pfAccess.loggedIn ? null : fail(409, 'PF_LOGIN_REQUIRED', 'Chưa đăng nhập Tài trợ lương.');
-  }
-
-  route('GET', '/portal/me/pf/access', function (state) { return ok(pfAccessView(state)); });
-
-  route('POST', '/portal/me/pf/access', function (state, req) {
-    var body = req.body || {};
-    var username = String(body.username || '').trim();
-    if (!username || !body.password) return fail(422, 'FIELDS_REQUIRED', 'Nhập đủ mã số thuế và mật khẩu.');
-    if (!/^\d{10}(\d{3})?$/.test(username)) return fail(422, 'USERNAME_FORMAT', 'Mã số thuế gồm 10 hoặc 13 chữ số.');
-    if (username !== state.customer.taxCode) return fail(422, 'NOT_OWN', 'Mã số thuế không phải của doanh nghiệp đang đăng nhập.');
-    if (body.password !== DEMO_HDDT.password) return fail(401, 'INVALID_CREDENTIALS', 'Mã số thuế hoặc mật khẩu không đúng.');
-    state.pfAccess = { loggedIn: true, account: username, loggedInAt: nowStamp() };
-    return ok(pfAccessView(state));
   });
 
   route('POST', '/portal/me/hddt/disconnect', function (state) {
@@ -908,7 +885,7 @@
   });
 
   route('POST', '/portal/me/pf/payroll-files', function (state, req) {
-    if (needPfAccess(state)) return needPfAccess(state);
+    if (needHddt(state)) return needHddt(state);
     var body = req.body || {};
     var name = payrollText(body.fileName);
     var lower = name.toLowerCase();
@@ -943,7 +920,7 @@
   });
 
   route('POST', '/portal/me/pf/requests', function (state, req) {
-    if (needPfAccess(state)) return needPfAccess(state);
+    if (needHddt(state)) return needHddt(state);
     var body = req.body || {};
     var file = state.payrollFiles.find(function (f) { return f.id === body.fileId; });
     if (!file) return fail(422, 'PAYROLL_FILE_NOT_FOUND', 'Chưa có bảng lương.');

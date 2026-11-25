@@ -1876,15 +1876,15 @@
   }
 
   /* ================================================================== Kết nối hóa đơn điện tử
-     Mua bán nợ và Tài trợ hóa đơn: chưa kết nối cổng thuế thì hiện màn đăng nhập HĐĐT thay cho trang.
-     Tài trợ lương dùng cùng khung nhưng là đăng nhập riêng bằng MST, không lấy hóa đơn.
+     Mua bán nợ, Tài trợ hóa đơn và Tài trợ lương: chưa kết nối cổng thuế thì hiện màn đăng nhập HĐĐT thay cho trang.
+     Một lần đăng nhập dùng chung cho cả ba sản phẩm; mỗi sản phẩm chỉ khác câu chữ.
      Khách tự nhập MST của mình và mật khẩu demo (DEMO_HDDT trong mock-server.js). */
   var hddtForm = { busy: false, done: false, error: '', errorField: '' };
   var HDDT_ERROR_FIELD = {
     FIELDS_REQUIRED: '', USERNAME_FORMAT: 'hddt-username', HDDT_NOT_OWN: 'hddt-username', NOT_OWN: 'hddt-username',
     HDDT_INVALID_CREDENTIALS: 'hddt-password', INVALID_CREDENTIALS: 'hddt-password'
   };
-  // Cổng đăng nhập trước trang: mặc định là kết nối HĐĐT; Tài trợ lương truyền access + câu chữ riêng.
+  // Cổng đăng nhập trước trang (kết nối HĐĐT); access để ngỏ nếu sau này một sản phẩm cần cách đăng nhập khác.
   var HDDT_ACCESS = {
     get: function () { return api.getHddt(); },
     open: function (h) { return h.connected; },
@@ -2018,27 +2018,16 @@
     step2: 'Hệ thống hiển thị danh sách hóa đơn đầu vào',
     step3: 'Chọn hóa đơn để tài trợ'
   });
-  // Tài trợ lương: đăng nhập bằng MST để dùng sản phẩm lương, không lấy hóa đơn.
+  // Tài trợ lương dùng chung đăng nhập HĐĐT: đăng nhập ở sản phẩm nào cũng mở cả ba sản phẩm.
   gateWithHddt(pf, 'Tài trợ lương', {
     eyebrow: 'Tài trợ lương',
     heading: 'Đăng nhập để sử dụng Tài trợ lương',
     lead: 'Quý khách hàng vui lòng đăng nhập để tạo yêu cầu chi lương cùng Advance. Chỉ cần đăng nhập một lần.',
-    step1: 'Đăng nhập tài khoản hóa đơn điện tử hoadondientu.gdt.gov.vn',
     step2: 'Tải lên bảng lương',
     step3: 'Gửi yêu cầu chi lương',
     formTitle: 'Đăng nhập',
-    userLabel: 'Tài khoản (mã số thuế)',
-    passwordLabel: 'Mật khẩu',
-    passwordPlaceholder: 'Nhập mật khẩu',
-    passwordNote: true,
     noteFocus: 'sử dụng sản phẩm Tài trợ lương của Advance',
-    passwordRequired: 'Quý khách hàng vui lòng nhập mật khẩu.',
-    errors: { INVALID_CREDENTIALS: 'Mật khẩu chưa đúng. Quý khách hàng vui lòng kiểm tra lại.' },
     busy: 'Đang đăng nhập…',
     done: 'Đã đăng nhập. Đang tải…'
-  }, {
-    get: function () { return api.getPfAccess(); },
-    open: function (a) { return a.loggedIn; },
-    connect: function (username, password) { return api.loginPf(username, password); }
   });
 })();
