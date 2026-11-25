@@ -2023,7 +2023,7 @@
     eyebrow: 'Tài trợ lương',
     heading: 'Đăng nhập để sử dụng Tài trợ lương',
     lead: 'Quý khách hàng vui lòng đăng nhập để tạo yêu cầu chi lương cùng Advance. Chỉ cần đăng nhập một lần.',
-    step1: 'Đăng nhập tài khoản',
+    step1: 'Đăng nhập tài khoản hóa đơn điện tử',
     step2: 'Tải lên bảng lương',
     step3: 'Gửi yêu cầu chi lương',
     formTitle: 'Đăng nhập',
