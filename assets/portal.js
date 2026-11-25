@@ -37,8 +37,8 @@
   /* ================================================================== S1. Đăng nhập */
   // Bước 1: email đã đăng ký với Advance. Bước 2: mã OTP gửi tới email đó (bản demo điền sẵn 123456, không gửi email thật).
   var LOGIN_ERRORS = {
-    EMAIL_INVALID: 'Email không đúng định dạng.',
-    EMAIL_NOT_REGISTERED: 'Email này chưa đăng ký với Advance. Vui lòng dùng email đã đăng ký hoặc liên hệ Advance.'
+    EMAIL_INVALID: 'Email chưa đúng định dạng. Quý khách hàng vui lòng kiểm tra lại.',
+    EMAIL_NOT_REGISTERED: 'Email này chưa được đăng ký với Advance. Quý khách hàng vui lòng dùng email đã đăng ký hoặc liên hệ Advance để được hỗ trợ.'
   };
   var loginTimer = null;
   function stopLoginTimer() { if (loginTimer) { clearInterval(loginTimer); loginTimer = null; } }
@@ -82,7 +82,7 @@
         return html`<div class="card login-card">
           <h1>Xác thực OTP</h1>
           <form data-submit="login-otp" novalidate autocomplete="off">
-            <p class="login-lead">Mã OTP gồm ${otp.length} số đã được gửi tới email ${otp.emailMasked}.</p>
+            <p class="login-lead">Advance đã gửi mã OTP gồm ${otp.length} số đến email ${otp.emailMasked}. Quý khách hàng vui lòng nhập mã để tiếp tục.</p>
             <div class="field">
               <label class="field-label" for="login-otp">Mã OTP</label>
               <input class="input input-otp" id="login-otp" data-keep="otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="${otp.length}" value="123456" ${st.busy ? App.raw('disabled') : ''}>
@@ -104,11 +104,11 @@
       }
       return html`<div class="card login-card">
         <h1>Đăng nhập</h1>
-        <p class="login-lead">Dùng bất kỳ email nào của doanh nghiệp đã đăng ký với Advance (chủ doanh nghiệp, kế toán, …). Mã OTP sẽ được gửi tới email này.</p>
+        <p class="login-lead">Quý khách hàng vui lòng đăng nhập bằng email của doanh nghiệp đã đăng ký với Advance (email của chủ doanh nghiệp, kế toán, …). Advance sẽ gửi mã OTP đến email này để xác thực.</p>
         <form data-submit="login" novalidate autocomplete="off">
           <div class="field">
             <label class="field-label" for="login-email">Email đã đăng ký với Advance</label>
-            <input class="input" id="login-email" data-keep="1" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Nhập email" ${st.busy ? App.raw('disabled') : ''}>
+            <input class="input" id="login-email" data-keep="1" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Nhập email của Quý khách hàng" ${st.busy ? App.raw('disabled') : ''}>
           </div>
           <p class="form-message" role="alert">${st.error}</p>
           <button type="submit" class="btn btn-primary btn-block" ${st.busy ? App.raw('disabled') : ''}>${st.busy ? 'Đang gửi mã OTP…' : 'Tiếp tục'}</button>
