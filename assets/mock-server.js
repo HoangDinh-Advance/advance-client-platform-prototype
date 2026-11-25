@@ -638,7 +638,7 @@
       paymentAccounts: [
         { purpose: 'PRINCIPAL', accountName: 'CÔNG TY TNHH ADVANCE VIETNAM', bankName: 'Ngân hàng TMCP Hàng Hải Việt Nam (MSB)',
           accountNo: '0123456789', transferContent: (state.customer.shortName || 'ANPHUC') + ' thanh toan' },
-        { purpose: 'FEE', accountName: 'CÔNG TY TNHH ADVANCE VIETNAM', bankName: 'Ngân hàng TNHH MTV Woori Việt Nam',
+        { purpose: 'FEE', accountName: 'CÔNG TY TNHH ADVANCE VIETNAM', bankName: 'Ngân hàng TMCP Kỹ Thương Việt Nam (Techcombank)',
           accountNo: '9876543210', transferContent: (state.customer.shortName || 'ANPHUC') + ' thanh toan phi' }
       ]
     });
