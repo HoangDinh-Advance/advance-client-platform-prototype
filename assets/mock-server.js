@@ -261,7 +261,7 @@
   function invoiceAge(invoice) { return dayNumber(DEMO_TODAY) - dayNumber(invoice.issueDate); }
   function overAge(invoice) { return invoiceAge(invoice) > MAX_INVOICE_AGE_DAYS; }
   function maxPurchase(amountExVat, ratePercent) { return Math.floor((amountExVat * ratePercent + 50) / 100); }
-  function available(limit) { return limit.granted - limit.used; }
+  function available(limit) { return Math.max(0, limit.granted - limit.used); } // dùng vượt hạn mức thì còn lại là 0
   function norm(value) { return String(value == null ? '' : value).trim().replace(/\s+/g, ' ').toUpperCase(); }
   function digits(value) { return String(value == null ? '' : value).replace(/\D/g, ''); }
   function maskPhone(p) { return p ? p.slice(0, 3) + ' ••• •' + p.slice(-3) : ''; }
@@ -393,7 +393,7 @@
     return {
       id: loan.id, product: loan.product,
       clientName: state.customer.name, clientTaxCode: state.customer.taxCode,
-      buyerName: buyer ? buyer.name : null, buyerTaxCode: loan.buyerTaxCode, invoiceNo: loan.invoiceNo,
+      buyerName: buyer ? buyer.name : loan.buyerName || null, buyerTaxCode: loan.buyerTaxCode, invoiceNo: loan.invoiceNo,
       dueDate: nextDue(loan), dpd: loan.dpd, outstanding: loan.outstanding,
       // Mua bán nợ: Principal amount của B2B chính là Giá Mua nợ, cũng là số tiền giải ngân.
       principalAmount: loan.schedule.reduce(function (sum, l) { return sum + l.amount; }, 0)
@@ -484,7 +484,8 @@
     var client = demoClients().find(function (c) { return (c.emailHashes || []).indexOf(hash) >= 0; });
     if (!client && email !== DEMO_EMAIL) return fail(401, 'EMAIL_NOT_REGISTERED', 'Email chưa đăng ký với Advance.');
     var customer = client
-      ? Object.assign({}, sample, { name: client.name, shortName: client.shortName, taxCode: client.taxCode, fees: client.fees, rrpRatePct: client.rrpRatePct, products: client.products })
+      ? Object.assign({}, sample, { name: client.name, shortName: client.shortName, taxCode: client.taxCode, fees: client.fees, rrpRatePct: client.rrpRatePct, products: client.products,
+          asOf: client.overview ? client.overview.asOf : null })
       : sample;
     customer.email = email;
     state.session.loggedIn = false;
@@ -511,6 +512,12 @@
       var fresh = seed();
       Object.keys(state).forEach(function (key) { delete state[key]; });
       Object.assign(state, fresh, { demo: settings });
+      // Khách test: hạn mức và khoản vay thật trên B2B (clients.js, overview) thay cho số mẫu.
+      var real = demoClients().find(function (c) { return c.taxCode === pending.customer.taxCode; });
+      if (real && real.overview) {
+        state.limits = JSON.parse(JSON.stringify(real.overview.limits));
+        state.loans = JSON.parse(JSON.stringify(real.overview.loans));
+      }
     }
     state.customer = pending.customer;
     state.session.loginOtp = null;
@@ -582,17 +589,20 @@
     });
     // Mỗi hóa đơn của giao dịch Mua bán nợ có ngày đến hạn riêng, nên mỗi dòng lịch chưa thu là một dòng.
     // Số tiền tài trợ = số tiền đã trả + số tiền đến hạn còn lại. Dòng đã trả hết sang danh sách Đã thanh toán.
-    var todayNo = dayNumber(DEMO_TODAY);
+    // Khách test: tính đến hạn / quá hạn theo ngày lấy dữ liệu thật (asOf); khách mẫu theo ngày cố định của bản demo.
+    var today = state.customer.asOf || DEMO_TODAY;
+    var todayNo = dayNumber(today);
     var weekStart = todayNo - ((todayNo + 3) % 7); // thứ Hai của tuần này
     var schedule = [];
     var paid = [];
     state.loans.forEach(function (loan) {
       var buyer = loan.buyerTaxCode ? buyerBy(state, loan.buyerTaxCode) : null;
       loan.schedule.forEach(function (line) {
+        var buyerName = buyer ? buyer.name : line.buyerName || loan.buyerName || null;
         var row = {
           loanId: loan.id, product: loan.product,
-          buyerName: buyer ? buyer.name : null, invoiceNo: line.invoiceNo || loan.invoiceNo,
-          payer: buyer ? 'BUYER' : 'CUSTOMER', payerName: buyer ? buyer.name : null,
+          buyerName: buyerName, invoiceNo: line.invoiceNo || loan.invoiceNo,
+          payer: buyerName ? 'BUYER' : 'CUSTOMER', payerName: buyerName,
           dueDate: line.dueDate, financedAmount: line.amount, paidAmount: line.collected
         };
         if (line.amount - line.collected > 0) {
@@ -610,7 +620,7 @@
     });
     paid.sort(function (a, b) { return (b.paidDate || '') < (a.paidDate || '') ? -1 : 1; });
     return ok({
-      today: DEMO_TODAY, limits: limits, schedule: schedule, paid: paid,
+      today: today, limits: limits, schedule: schedule, paid: paid,
       // Thông tin thanh toán của Advance: một tài khoản nhận khoản thanh toán gốc, một tài khoản nhận phí.
       // Nội dung chuyển khoản theo tên viết tắt của khách hàng. Số tài khoản là số mẫu.
       paymentAccounts: [
