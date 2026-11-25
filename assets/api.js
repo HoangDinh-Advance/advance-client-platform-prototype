@@ -43,7 +43,7 @@
     ApiError: ApiError,
 
     /* ---------- Cổng -> B2B ---------- */
-    login: function (email, taxCode) { return transport('POST', '/portal/auth/login', { email: email, taxCode: taxCode }); },
+    login: function (email) { return transport('POST', '/portal/auth/login', { email: email }); },
     confirmLoginOtp: function (otp) { return transport('POST', '/portal/auth/login/otp', { otp: otp }); },
     resendLoginOtp: function () { return transport('POST', '/portal/auth/login/otp/resend'); },
     logout: function () { return transport('POST', '/portal/auth/logout'); },

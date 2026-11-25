@@ -35,7 +35,11 @@
   function accountText(account) { return account ? account.bankName + ' · ' + account.accountNo : '(chưa có)'; }
 
   /* ================================================================== S1. Đăng nhập */
-  // Bước 1: email + MST. Bước 2: mã OTP gửi tới email đó (bản demo điền sẵn 123456, không gửi email thật).
+  // Bước 1: email đã đăng ký với Advance. Bước 2: mã OTP gửi tới email đó (bản demo điền sẵn 123456, không gửi email thật).
+  var LOGIN_ERRORS = {
+    EMAIL_INVALID: 'Email không đúng định dạng.',
+    EMAIL_NOT_REGISTERED: 'Email này chưa đăng ký với Advance. Vui lòng dùng email đã đăng ký hoặc liên hệ Advance.'
+  };
   var loginTimer = null;
   function stopLoginTimer() { if (loginTimer) { clearInterval(loginTimer); loginTimer = null; } }
   function loginRemaining(otp) { return Math.max(0, Math.ceil((otp.deadline - Date.now()) / 1000)); }
@@ -100,14 +104,11 @@
       }
       return html`<div class="card login-card">
         <h1>Đăng nhập</h1>
+        <p class="login-lead">Dùng bất kỳ email nào của doanh nghiệp đã đăng ký với Advance (chủ doanh nghiệp, kế toán, …). Mã OTP sẽ được gửi tới email này.</p>
         <form data-submit="login" novalidate autocomplete="off">
           <div class="field">
-            <label class="field-label" for="login-email">Email</label>
-            <input class="input" id="login-email" data-keep="1" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Email của doanh nghiệp" ${st.busy ? App.raw('disabled') : ''}>
-          </div>
-          <div class="field">
-            <label class="field-label" for="login-tax">Mã số thuế</label>
-            <input class="input" id="login-tax" data-keep="1" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="Mã số thuế của doanh nghiệp" ${st.busy ? App.raw('disabled') : ''}>
+            <label class="field-label" for="login-email">Email đã đăng ký với Advance</label>
+            <input class="input" id="login-email" data-keep="1" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Nhập email" ${st.busy ? App.raw('disabled') : ''}>
           </div>
           <p class="form-message" role="alert">${st.error}</p>
           <button type="submit" class="btn btn-primary btn-block" ${st.busy ? App.raw('disabled') : ''}>${st.busy ? 'Đang gửi mã OTP…' : 'Tiếp tục'}</button>
@@ -117,18 +118,17 @@
     actions: {
       login: function () {
         var email = document.getElementById('login-email').value;
-        var taxCode = document.getElementById('login-tax').value;
         login.state.busy = true;
         login.state.error = '';
         App.paint();
-        api.login(email, taxCode).then(function (result) {
+        api.login(email).then(function (result) {
           setLoginOtp(login, result, '');
           App.paint();
           var el = document.getElementById('login-otp');
           if (el) el.focus();
         }).catch(function (error) {
           login.state.busy = false;
-          login.state.error = error.code === 'INVALID_CREDENTIALS' ? 'Email hoặc mã số thuế không đúng' : error.message;
+          login.state.error = LOGIN_ERRORS[error.code] || error.message;
           App.paint();
         });
       },

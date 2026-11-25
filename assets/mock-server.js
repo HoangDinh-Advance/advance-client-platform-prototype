@@ -478,16 +478,13 @@
   route('POST', '/portal/auth/login', function (state, req) {
     var body = req.body || {};
     var email = String(body.email || '').trim().toLowerCase();
-    var taxCode = digits(body.taxCode);
-    // MST phải là khách mẫu hoặc khách test; email phải là một email của công ty đó trên B2B (khách mẫu: DEMO_EMAIL).
+    // Đăng nhập chỉ bằng email: mọi email của doanh nghiệp đã đăng ký với Advance trên B2B (chủ, kế toán, …).
+    // Khách test: so với emailHashes trong clients.js; khách mẫu: DEMO_EMAIL.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(422, 'EMAIL_INVALID', 'Email không đúng định dạng.');
     var sample = seed().customer;
-    var client = demoClients().find(function (c) { return c.taxCode === taxCode; });
-    var emailOk = client
-      ? !client.emailHashes || client.emailHashes.indexOf(emailHash(email)) >= 0
-      : taxCode === sample.taxCode && email === DEMO_EMAIL;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !emailOk) {
-      return fail(401, 'INVALID_CREDENTIALS', 'Email hoặc mã số thuế không đúng');
-    }
+    var hash = emailHash(email);
+    var client = demoClients().find(function (c) { return (c.emailHashes || []).indexOf(hash) >= 0; });
+    if (!client && email !== DEMO_EMAIL) return fail(401, 'EMAIL_NOT_REGISTERED', 'Email chưa đăng ký với Advance.');
     var customer = client
       ? Object.assign({}, sample, { name: client.name, shortName: client.shortName, taxCode: client.taxCode, fees: client.fees, rrpRatePct: client.rrpRatePct })
       : sample;
