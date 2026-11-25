@@ -1894,9 +1894,9 @@
   var HDDT_COPY = {
     eyebrow: 'Hóa đơn điện tử', heading: 'Kết nối tài khoản hóa đơn điện tử', step1: 'Đăng nhập tài khoản hóa đơn điện tử',
     formTitle: 'Đăng nhập HĐĐT', userLabel: 'Tài khoản (mã số thuế)',
-    passwordLabel: 'Mật khẩu cổng hóa đơn điện tử', passwordPlaceholder: 'Nhập mật khẩu hoadondientu.gdt.gov.vn',
-    passwordNote: true, passwordRequired: 'Nhập mật khẩu cổng hóa đơn điện tử.',
-    errors: { HDDT_INVALID_CREDENTIALS: 'Mật khẩu cổng hóa đơn điện tử không đúng.' },
+    passwordLabel: 'Mật khẩu', passwordPlaceholder: 'Nhập mật khẩu',
+    passwordNote: true, passwordRequired: 'Quý khách hàng vui lòng nhập mật khẩu.',
+    errors: { HDDT_INVALID_CREDENTIALS: 'Mật khẩu chưa đúng. Quý khách hàng vui lòng kiểm tra lại.' },
     busy: 'Đang đăng nhập cổng hóa đơn điện tử…', done: 'Đã đăng nhập. Đang tải hóa đơn…'
   };
 
@@ -1994,10 +1994,7 @@
             <label class="field-label" for="hddt-password">${copy.passwordLabel}</label>
             <input class="input" id="hddt-password" type="password" autocomplete="new-password" placeholder="${copy.passwordPlaceholder}" aria-invalid="${f.errorField === 'hddt-password' ? 'true' : 'false'}" ${copy.passwordNote ? App.raw('aria-describedby="hddt-password-note"') : ''} ${dis}>
           </div>
-          ${copy.passwordNote && html`<div class="hddt-note" id="hddt-password-note">
-            Quý khách hàng vui lòng nhập mật khẩu dùng để đăng nhập <strong>Cổng hóa đơn điện tử</strong>
-            <a href="https://hoadondientu.gdt.gov.vn/" target="_blank" rel="noopener">hoadondientu.gdt.gov.vn</a>.
-          </div>`}
+          ${copy.passwordNote && html`<p class="hddt-note" id="hddt-password-note">Quý khách hàng vui lòng nhập mật khẩu Cổng hóa đơn điện tử hoadondientu.gdt.gov.vn dùng để <span>đăng nhập và sử dụng sản phẩm của Advance</span>.</p>`}
           <p class="form-message ${f.error ? '' : 'is-status'}" role="${f.error ? 'alert' : 'status'}" aria-live="polite">${status || ''}</p>
           <button type="submit" class="btn btn-primary btn-block" ${dis}>Đăng nhập</button>
         </form>
