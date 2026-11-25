@@ -484,7 +484,7 @@
     var client = demoClients().find(function (c) { return (c.emailHashes || []).indexOf(hash) >= 0; });
     if (!client && email !== DEMO_EMAIL) return fail(401, 'EMAIL_NOT_REGISTERED', 'Email chưa đăng ký với Advance.');
     var customer = client
-      ? Object.assign({}, sample, { name: client.name, shortName: client.shortName, taxCode: client.taxCode, fees: client.fees, rrpRatePct: client.rrpRatePct })
+      ? Object.assign({}, sample, { name: client.name, shortName: client.shortName, taxCode: client.taxCode, fees: client.fees, rrpRatePct: client.rrpRatePct, products: client.products })
       : sample;
     customer.email = email;
     state.session.loggedIn = false;
@@ -515,7 +515,7 @@
     state.customer = pending.customer;
     state.session.loginOtp = null;
     state.session.loggedIn = true;
-    return ok({ name: state.customer.name, taxCode: state.customer.taxCode });
+    return ok(meView(state));
   }, { pub: true });
 
   route('POST', '/portal/auth/login/otp/resend', function (state) {
@@ -533,6 +533,15 @@
   function hddtView(state) {
     var h = state.hddt || {};
     return { connected: !!h.connected, account: h.account || null, connectedAt: h.connectedAt || null, lastSyncAt: h.lastSyncAt || null };
+  }
+  // Sản phẩm khách đang dùng (theo B2B); khách mẫu dùng cả ba. Sản phẩm khác hiện xám và không gọi được.
+  var ALL_PRODUCTS = ['PF', 'IF', 'RP'];
+  function productsOf(state) { return state.customer.products || ALL_PRODUCTS; }
+  function needProduct(state, product) {
+    return productsOf(state).indexOf(product) >= 0 ? null : fail(403, 'PRODUCT_NOT_ENABLED', 'Quý khách hàng chưa sử dụng sản phẩm này.');
+  }
+  function meView(state) {
+    return { name: state.customer.name, taxCode: state.customer.taxCode, products: productsOf(state).slice() };
   }
   function needHddt(state) {
     return state.hddt && state.hddt.connected ? null : fail(409, 'HDDT_NOT_CONNECTED', 'Chưa kết nối tài khoản hóa đơn điện tử.');
@@ -563,13 +572,13 @@
   }, { pub: true });
 
   route('GET', '/portal/me', function (state) {
-    return ok({ name: state.customer.name, taxCode: state.customer.taxCode });
+    return ok(meView(state));
   });
 
   route('GET', '/portal/me/overview', function (state) {
     var limits = ['PF', 'IF', 'RP'].map(function (product) {
       var limit = state.limits[product];
-      return { product: product, granted: limit.granted, used: limit.used, available: available(limit) };
+      return { product: product, enabled: productsOf(state).indexOf(product) >= 0, granted: limit.granted, used: limit.used, available: available(limit) };
     });
     // Mỗi hóa đơn của giao dịch Mua bán nợ có ngày đến hạn riêng, nên mỗi dòng lịch chưa thu là một dòng.
     // Số tiền tài trợ = số tiền đã trả + số tiền đến hạn còn lại. Dòng đã trả hết sang danh sách Đã thanh toán.
@@ -742,6 +751,7 @@
 
   // Kiểm tra một yêu cầu bán nợ, dùng chung cho tính chiết khấu dự kiến và gửi yêu cầu.
   function checkSale(state, body) {
+    if (needProduct(state, 'RP')) return { error: needProduct(state, 'RP') };
     if (needHddt(state)) return { error: needHddt(state) };
     var ids = Array.isArray(body.invoiceIds) ? body.invoiceIds : [];
     var buyer = buyerBy(state, body.buyerTaxCode);
@@ -824,6 +834,7 @@
   });
 
   route('POST', '/portal/me/if/requests', function (state, req) {
+    if (needProduct(state, 'IF')) return needProduct(state, 'IF');
     if (needHddt(state)) return needHddt(state);
     var ids = Array.isArray((req.body || {}).invoiceIds) ? req.body.invoiceIds : [];
     var pack = packagesFor(state, 'IF', IF_PACKAGES).find(function (p) { return p.tenorDays === Number((req.body || {}).tenorDays); });
@@ -885,6 +896,7 @@
   });
 
   route('POST', '/portal/me/pf/payroll-files', function (state, req) {
+    if (needProduct(state, 'PF')) return needProduct(state, 'PF');
     if (needHddt(state)) return needHddt(state);
     var body = req.body || {};
     var name = payrollText(body.fileName);
@@ -920,6 +932,7 @@
   });
 
   route('POST', '/portal/me/pf/requests', function (state, req) {
+    if (needProduct(state, 'PF')) return needProduct(state, 'PF');
     if (needHddt(state)) return needHddt(state);
     var body = req.body || {};
     var file = state.payrollFiles.find(function (f) { return f.id === body.fileId; });

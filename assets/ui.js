@@ -153,17 +153,24 @@
 
   var PORTAL_NAV = [
     { route: 'tong-quan', label: 'Tổng quan' },
-    { route: 'mua-ban-no', label: 'Mua bán nợ' },
-    { route: 'invoice-financing', label: 'Tài trợ hóa đơn' },
-    { route: 'payroll-financing', label: 'Tài trợ lương' }
+    { route: 'mua-ban-no', label: 'Mua bán nợ', product: 'RP' },
+    { route: 'invoice-financing', label: 'Tài trợ hóa đơn', product: 'IF' },
+    { route: 'payroll-financing', label: 'Tài trợ lương', product: 'PF' }
   ];
+  // Sản phẩm khách chưa dùng: mục menu xám (vẫn bấm được để xem trang hướng dẫn liên hệ Advance).
+  function productEnabled(product) {
+    return !product || !App.me || !App.me.products || App.me.products.indexOf(product) >= 0;
+  }
+  var LOCKED_TIP = 'Quý khách hàng vui lòng liên hệ Advance để được tư vấn và kích hoạt sản phẩm này.';
+  var LOCK_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 
   function sidebarHtml() {
     var view = App.view;
     if (view.mode === 'portal') {
       return html`<aside class="sidebar"><nav aria-label="Chính">
         ${PORTAL_NAV.map(function (item) {
-          return html`<a href="#${item.route}" aria-current="${view.nav === item.route ? 'page' : 'false'}">${item.label}</a>`;
+          var locked = !productEnabled(item.product);
+          return html`<a href="#${item.route}" class="${locked ? 'is-locked' : ''}" aria-current="${view.nav === item.route ? 'page' : 'false'}" ${locked ? raw('data-tip="' + LOCKED_TIP + '" aria-description="' + LOCKED_TIP + '"') : ''}>${item.label}${locked && raw(LOCK_ICON)}</a>`;
         })}
       </nav></aside>`;
     }
@@ -487,6 +494,7 @@
   App.authTag = authTag;
   App.AUTH_STATUS = AUTH_STATUS;
   App.toast = toast;
+  App.productEnabled = productEnabled;
   App.loadScript = loadScript;
   App.saveFile = saveFile;
   App.paint = paint;

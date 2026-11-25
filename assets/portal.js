@@ -245,6 +245,12 @@
       if (!d) return html`<div class="page-head"><h1>Tổng quan</h1></div>${loadingCard()}`;
 
       var cards = d.limits.map(function (limit) {
+        if (!limit.enabled) {
+          return html`<div class="metric is-locked">
+            <div class="metric-label">${PRODUCT[limit.product]}</div>
+            <div class="metric-locked-text">Quý khách hàng chưa sử dụng sản phẩm này.</div>
+          </div>`;
+        }
         var pct = limit.granted > 0 ? Math.min(100, Math.round(limit.used / limit.granted * 100)) : 0;
         return html`<div class="metric">
           <div class="metric-label">${PRODUCT[limit.product]}</div>
@@ -2008,6 +2014,31 @@
       <button type="button" class="text-button" data-act="hddt-disconnect">Ngắt kết nối</button></div>`;
   }
 
+  /* Sản phẩm khách chưa dùng (theo B2B): trang hiện thông báo thay cho màn đăng nhập HĐĐT và nội dung. */
+  function lockUnusedProduct(view, product, title) {
+    var load = view.load, render = view.render, onData = view.onData, hasBar = view.hasBar, renderBar = view.renderBar;
+    function locked(v) { return !!(v.data && v.data.productLocked); }
+    view.load = function () {
+      var self = this;
+      return api.getMe().then(function (me) {
+        if ((me.products || []).indexOf(product) < 0) return { productLocked: true };
+        return load.call(self);
+      });
+    };
+    view.onData = function () { if (!locked(this) && onData) onData.call(this); };
+    view.hasBar = function () { return !locked(this) && !!hasBar && hasBar.call(this); };
+    view.renderBar = function () { return locked(this) || !renderBar ? '' : renderBar.call(this); };
+    view.render = function () {
+      if (!locked(this)) return render.call(this);
+      return html`<div class="page-head"><h1>${title}</h1></div>
+        <section class="card product-locked">
+          <span class="lock-badge"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+          <h2>Quý khách hàng chưa sử dụng sản phẩm ${title}</h2>
+          <p>Vui lòng liên hệ Advance để được tư vấn và mở sản phẩm ${title} cho doanh nghiệp.</p>
+        </section>`;
+    };
+  }
+
   // Ba màn đăng nhập dùng cùng một khuôn câu chữ; chỉ khác phần nói về sản phẩm.
   gateWithHddt(rp, 'Mua bán nợ', {
     lead: 'Kết nối một lần duy nhất, hệ thống tự lấy hóa đơn đầu ra từ cổng hóa đơn điện tử. Quý khách hàng không cần gửi hóa đơn qua email.',
@@ -2029,4 +2060,7 @@
     noteFocus: 'sử dụng sản phẩm Tài trợ lương của Advance',
     done: 'Đã kết nối. Đang tải…'
   });
+  lockUnusedProduct(rp, 'RP', 'Mua bán nợ');
+  lockUnusedProduct(invf, 'IF', 'Tài trợ hóa đơn');
+  lockUnusedProduct(pf, 'PF', 'Tài trợ lương');
 })();

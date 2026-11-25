@@ -225,6 +225,16 @@ textarea.input { height: auto; min-height: 76px; resize: vertical; line-height: 
 .sidebar a { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0.75rem; border-radius: 7px; font-size: 13px; font-weight: 500; color: #4d6068; text-decoration: none; white-space: nowrap; }
 .sidebar a:hover { background: #eef3f0; color: var(--ink); }
 .sidebar a[aria-current="page"] { background: var(--brand-soft); color: var(--brand); font-weight: 650; }
+.sidebar a.is-locked { color: #a3aeaa; }
+.sidebar a.is-locked:hover { background: #f1f3f2; color: #8b9893; }
+.sidebar a.is-locked[aria-current="page"] { background: #eef0ef; color: #7d8a85; }
+.sidebar a[data-tip] { position: relative; }
+.sidebar a[data-tip]::after {
+  content: attr(data-tip); position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%); z-index: 40;
+  width: 230px; white-space: normal; padding: 0.6rem 0.75rem; border-radius: 8px; background: var(--ink); color: #fff;
+  font-size: 12px; font-weight: 500; line-height: 1.5; box-shadow: 0 8px 24px #10282f33; opacity: 0; visibility: hidden; transition: opacity 0.12s; pointer-events: none;
+}
+.sidebar a[data-tip]:hover::after, .sidebar a[data-tip]:focus-visible::after { opacity: 1; visibility: visible; }
 .sidebar .nav-group { font-size: 10px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: #8a9990; padding: 0.9rem 0.75rem 0.3rem; }
 .sidebar .count { font-size: 10px; font-weight: 600; min-width: 19px; padding: 1px 6px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); text-align: center; }
 .main { flex: 1; min-width: 0; padding: 1.75rem var(--gutter-right) 3rem var(--gutter-left); display: flex; flex-direction: column; gap: 1.25rem; }
@@ -235,6 +245,7 @@ textarea.input { height: auto; min-height: 76px; resize: vertical; line-height: 
   .sidebar { position: static; padding: 0; border-bottom: 1px solid var(--line); background: var(--panel); }
   .sidebar nav { flex-direction: row; overflow-x: auto; gap: 0.25rem; padding: 0.5rem var(--gutter-right) 0.5rem var(--gutter-left); }
   .sidebar .nav-group { display: none; }
+  .sidebar a[data-tip]::after { left: 0; top: calc(100% + 6px); transform: none; }
 }
 .page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; }
 .page-head h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.6px; line-height: 1.25; }
@@ -444,3 +455,12 @@ textarea.input { height: auto; min-height: 76px; resize: vertical; line-height: 
 .data-table tr.is-error td { background: #fdf3f0; }
 .data-table tr.is-error td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 .row-errors { color: var(--danger); font-weight: 600; }
+
+/* Sản phẩm khách chưa dùng */
+.metric.is-locked { background: #f6f7f6; border-style: dashed; }
+.metric.is-locked .metric-label { color: #8b9893; }
+.metric-locked-text { margin-top: 0.75rem; font-size: 13px; color: #7d8a85; line-height: 1.5; }
+.product-locked { padding: 2.5rem 1.75rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+.product-locked .lock-badge { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #eef0ef; color: #7d8a85; }
+.product-locked h2 { font-size: 18px; font-weight: 650; }
+.product-locked p { font-size: 13px; color: var(--muted); line-height: 1.6; max-width: 46ch; }
