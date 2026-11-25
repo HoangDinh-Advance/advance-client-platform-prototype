@@ -13,7 +13,7 @@ Trang tĩnh thuần HTML/CSS/JS, không cần build.
 
 Đăng nhập bằng email và MST của doanh nghiệp (khách mẫu: `ketoan.mauanphuc@gmail.com` / `0100000001`; màn đăng nhập không điền sẵn), rồi xác thực mã OTP gửi tới email đó. Email phải là email của doanh nghiệp: khách mẫu chỉ nhận đúng email trên, khách test chỉ nhận các email của công ty trên B2B (khi `assets/clients.js` có `emailHashes`). Bản demo không gửi email thật: mã OTP điền sẵn `123456`, nhập đủ 6 số bất kỳ là đúng, toàn số 0 là sai.
 
-Biểu phí (Gói của Tài trợ lương, Tài trợ hóa đơn và mức chiết khấu Mua bán nợ) đi theo khách đang đăng nhập. Bản trên GitHub Pages chỉ có khách mẫu với biểu phí mẫu.
+Biểu phí (Gói của Tài trợ lương, Tài trợ hóa đơn và mức chiết khấu Mua bán nợ) đi theo khách đang đăng nhập. Danh sách 19 khách test và biểu phí của họ (lấy từ B2B ngày 23/11/2026) nằm ở `assets/clients.js`; khách mẫu `0100000001` dùng biểu phí mẫu, MST khác không đăng nhập được.
 
 Vào **Mua bán nợ** hoặc **Tài trợ hóa đơn** lần đầu sẽ gặp thêm lớp **Đăng nhập HĐĐT** (tài khoản / mã số thuế + mật khẩu hóa đơn điện tử), giống prototype cổng HĐĐT trước đây. Khách tự nhập MST của doanh nghiệp mình (hoặc tài khoản con dạng MST-U001) và mật khẩu demo `123456`; bản demo không gọi cổng thuế và không giữ mật khẩu. Kết nối một lần dùng chung cho cả hai sản phẩm, giữ đến khi bấm Ngắt kết nối hoặc Đặt lại demo.
 
