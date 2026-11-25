@@ -2010,12 +2010,12 @@
 
   gateWithHddt(rp, 'Mua bán nợ', {
     lead: 'Kết nối một lần, hệ thống lấy hóa đơn đầu ra từ cổng hóa đơn điện tử. Quý khách không cần gửi hóa đơn qua email.',
-    step2: 'Hệ thống lấy hóa đơn đầu ra',
+    step2: 'Hệ thống hiển thị danh sách hóa đơn đầu ra',
     step3: 'Chọn hóa đơn để bán'
   });
   gateWithHddt(invf, 'Tài trợ hóa đơn', {
     lead: 'Kết nối một lần, hệ thống tự lấy hóa đơn đầu vào từ cổng hóa đơn điện tử. Quý khách không cần gửi hóa đơn qua email.',
-    step2: 'Hệ thống lấy hóa đơn đầu vào',
+    step2: 'Hệ thống hiển thị danh sách hóa đơn đầu vào',
     step3: 'Chọn hóa đơn để tài trợ'
   });
   // Tài trợ lương: đăng nhập bằng MST để dùng sản phẩm lương, không lấy hóa đơn.
