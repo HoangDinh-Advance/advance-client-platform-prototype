@@ -1897,7 +1897,7 @@
     passwordLabel: 'Mật khẩu', passwordPlaceholder: 'Nhập mật khẩu',
     passwordNote: true, noteFocus: 'sử dụng sản phẩm của Advance', passwordRequired: 'Quý khách hàng vui lòng nhập mật khẩu.',
     errors: { HDDT_INVALID_CREDENTIALS: 'Mật khẩu chưa đúng. Quý khách hàng vui lòng kiểm tra lại.' },
-    busy: 'Đang đăng nhập cổng hóa đơn điện tử…', done: 'Đã đăng nhập. Đang tải hóa đơn…'
+    busy: 'Đang kết nối tài khoản hóa đơn điện tử…', done: 'Đã kết nối. Đang tải hóa đơn…'
   };
 
   function gateWithHddt(view, title, pageCopy, access) {
@@ -2008,26 +2008,25 @@
       <button type="button" class="text-button" data-act="hddt-disconnect">Ngắt kết nối</button></div>`;
   }
 
+  // Ba màn đăng nhập dùng cùng một khuôn câu chữ; chỉ khác phần nói về sản phẩm.
   gateWithHddt(rp, 'Mua bán nợ', {
-    lead: 'Kết nối một lần, hệ thống lấy hóa đơn đầu ra từ cổng hóa đơn điện tử. Quý khách không cần gửi hóa đơn qua email.',
+    lead: 'Kết nối một lần duy nhất, hệ thống tự lấy hóa đơn đầu ra từ cổng hóa đơn điện tử. Quý khách hàng không cần gửi hóa đơn qua email.',
     step2: 'Hệ thống hiển thị danh sách hóa đơn đầu ra',
-    step3: 'Chọn hóa đơn để bán'
+    step3: 'Chọn hóa đơn để bán',
+    noteFocus: 'sử dụng sản phẩm Mua bán nợ của Advance'
   });
   gateWithHddt(invf, 'Tài trợ hóa đơn', {
-    lead: 'Kết nối một lần, hệ thống tự lấy hóa đơn đầu vào từ cổng hóa đơn điện tử. Quý khách không cần gửi hóa đơn qua email.',
+    lead: 'Kết nối một lần duy nhất, hệ thống tự lấy hóa đơn đầu vào từ cổng hóa đơn điện tử. Quý khách hàng không cần gửi hóa đơn qua email.',
     step2: 'Hệ thống hiển thị danh sách hóa đơn đầu vào',
-    step3: 'Chọn hóa đơn để tài trợ'
+    step3: 'Chọn hóa đơn để tài trợ',
+    noteFocus: 'sử dụng sản phẩm Tài trợ hóa đơn của Advance'
   });
   // Tài trợ lương dùng chung đăng nhập HĐĐT: đăng nhập ở sản phẩm nào cũng mở cả ba sản phẩm.
   gateWithHddt(pf, 'Tài trợ lương', {
-    eyebrow: 'Tài trợ lương',
-    heading: 'Đăng nhập để sử dụng Tài trợ lương',
-    lead: 'Quý khách hàng vui lòng đăng nhập để tạo yêu cầu chi lương cùng Advance. Chỉ cần đăng nhập một lần.',
+    lead: 'Kết nối một lần duy nhất, Quý khách hàng tạo yêu cầu chi lương ngay trên hệ thống. Quý khách hàng không cần gửi bảng lương qua email.',
     step2: 'Tải lên bảng lương',
     step3: 'Gửi yêu cầu chi lương',
-    formTitle: 'Đăng nhập',
     noteFocus: 'sử dụng sản phẩm Tài trợ lương của Advance',
-    busy: 'Đang đăng nhập…',
-    done: 'Đã đăng nhập. Đang tải…'
+    done: 'Đã kết nối. Đang tải…'
   });
 })();
