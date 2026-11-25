@@ -1910,7 +1910,7 @@
   /* ================================================================== Kết nối hóa đơn điện tử
      Mua bán nợ, Tài trợ hóa đơn và Tài trợ lương: chưa kết nối cổng thuế thì hiện màn đăng nhập HĐĐT thay cho trang.
      Một lần đăng nhập dùng chung cho cả ba sản phẩm; mỗi sản phẩm chỉ khác câu chữ.
-     Khách tự nhập MST của mình và mật khẩu demo (DEMO_HDDT trong mock-server.js). */
+     MST hiện sẵn; bản demo nhận mọi mật khẩu khác rỗng. */
   var hddtForm = { busy: false, done: false, error: '', errorField: '' };
   var HDDT_ERROR_FIELD = {
     FIELDS_REQUIRED: '', USERNAME_FORMAT: 'hddt-username', HDDT_NOT_OWN: 'hddt-username', NOT_OWN: 'hddt-username',

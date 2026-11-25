@@ -544,7 +544,7 @@
   }, { pub: true });
 
   // ---- Kết nối hóa đơn điện tử. Bản demo không gọi cổng thuế: chỉ nhận tài khoản mẫu bên dưới.
-  var DEMO_HDDT = { password: '123456' }; // mật khẩu HĐĐT của bản demo, CS báo cho khách khi test
+  // Bản demo nhận mọi mật khẩu HĐĐT (khác rỗng): khách test gõ gì cũng đăng nhập được.
   function hddtView(state) {
     var h = state.hddt || {};
     return { connected: !!h.connected, account: h.account || null, connectedAt: h.connectedAt || null, lastSyncAt: h.lastSyncAt || null };
@@ -582,7 +582,6 @@
     if (!username || !body.password) return fail(422, 'FIELDS_REQUIRED', 'Nhập đủ tài khoản và mật khẩu.');
     if (!/^\d{10}(\d{3})?(-U\d{3})?$/i.test(username)) return fail(422, 'USERNAME_FORMAT', 'Tài khoản HĐĐT phải là mã số thuế hoặc tài khoản con dạng MST-U001.');
     if (username.split('-')[0] !== state.customer.taxCode) return fail(422, 'HDDT_NOT_OWN', 'Tài khoản HĐĐT không thuộc doanh nghiệp đang đăng nhập.');
-    if (body.password !== DEMO_HDDT.password) return fail(401, 'HDDT_INVALID_CREDENTIALS', 'Tài khoản hoặc mật khẩu hóa đơn điện tử không đúng.');
     var stamp = nowStamp();
     state.hddt = { connected: true, account: username.toUpperCase(), connectedAt: stamp, lastSyncAt: stamp };
     return ok(hddtView(state));
