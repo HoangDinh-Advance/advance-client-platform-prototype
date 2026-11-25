@@ -102,6 +102,22 @@
           </div>
         </div>`;
       }
+      if (st.step === 'company') {
+        return html`<div class="card login-card">
+          <h1>Chọn doanh nghiệp</h1>
+          <p class="login-lead">Email ${st.email} được đăng ký cho nhiều doanh nghiệp. Quý khách hàng vui lòng chọn doanh nghiệp muốn đăng nhập.</p>
+          <div class="company-pick">
+            ${st.companies.map(function (c) {
+              return html`<button type="button" class="company-option" data-act="login-company" data-tax="${c.taxCode}" ${st.busy ? App.raw('disabled') : ''}>
+                <span class="company-option-name">${c.name}</span><span class="company-option-tax">MST ${c.taxCode}</span></button>`;
+            })}
+          </div>
+          <p class="form-message" role="alert">${st.error}</p>
+          <div class="login-links">
+            <button type="button" class="text-button" data-act="login-back" ${st.busy ? App.raw('disabled') : ''}>Quay lại</button>
+          </div>
+        </div>`;
+      }
       return html`<div class="card login-card">
         <h1>Đăng nhập</h1>
         <p class="login-lead">Quý khách hàng vui lòng đăng nhập bằng email của doanh nghiệp đã đăng ký với Advance (email của chủ doanh nghiệp, kế toán, …). Advance sẽ gửi mã OTP đến email này để xác thực.</p>
@@ -116,12 +132,22 @@
       </div>`;
     },
     actions: {
-      login: function () {
-        var email = document.getElementById('login-email').value;
+      login: function () { login.actions['login-start'](document.getElementById('login-email').value); },
+      'login-company': function (el) { login.actions['login-start'](login.state.email, el.getAttribute('data-tax')); },
+      // Gọi trực tiếp (không gắn vào nút): gửi email (và MST nếu email thuộc nhiều doanh nghiệp).
+      'login-start': function (email, taxCode) {
         login.state.busy = true;
         login.state.error = '';
+        login.state.email = email;
         App.paint();
-        api.login(email).then(function (result) {
+        api.login(email, taxCode).then(function (result) {
+          if (result.status === 'CHOOSE_COMPANY') {
+            login.state.busy = false;
+            login.state.step = 'company';
+            login.state.companies = result.companies;
+            App.paint();
+            return;
+          }
           setLoginOtp(login, result, '');
           App.paint();
           var el = document.getElementById('login-otp');

@@ -481,8 +481,16 @@
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(422, 'EMAIL_INVALID', 'Email không đúng định dạng.');
     var sample = seed().customer;
     var hash = emailHash(email);
-    var client = demoClients().find(function (c) { return (c.emailHashes || []).indexOf(hash) >= 0; });
-    if (!client && email !== DEMO_EMAIL) return fail(401, 'EMAIL_NOT_REGISTERED', 'Email chưa đăng ký với Advance.');
+    var matches = demoClients().filter(function (c) { return (c.emailHashes || []).indexOf(hash) >= 0; });
+    if (!matches.length && email !== DEMO_EMAIL) return fail(401, 'EMAIL_NOT_REGISTERED', 'Email chưa đăng ký với Advance.');
+    // Một email có thể thuộc nhiều doanh nghiệp (cùng chủ): khách chọn doanh nghiệp rồi mới gửi OTP.
+    var client = matches[0] || null;
+    if (matches.length > 1) {
+      client = matches.find(function (c) { return c.taxCode === digits(body.taxCode); }) || null;
+      if (!client) {
+        return ok({ status: 'CHOOSE_COMPANY', companies: matches.map(function (c) { return { taxCode: c.taxCode, name: c.name }; }) });
+      }
+    }
     var customer = client
       ? Object.assign({}, sample, { name: client.name, shortName: client.shortName, taxCode: client.taxCode, fees: client.fees, rrpRatePct: client.rrpRatePct, products: client.products,
           asOf: client.overview ? client.overview.asOf : null })
