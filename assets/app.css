@@ -404,6 +404,8 @@ textarea.input { height: auto; min-height: 76px; resize: vertical; line-height: 
 .hddt-form { border: 1px solid #dce7d8; border-radius: 12px; padding: 1.5rem; box-shadow: 0 18px 55px #345b3010; background: var(--panel); min-width: 0; }
 .hddt-form h3 { font-size: 18px; font-weight: 600; margin-bottom: 1.1rem; }
 .hddt-form .field { margin-bottom: 1rem; }
+.hddt-note { margin: -0.25rem 0 1rem; padding: 0.7rem 0.85rem; border: 1px solid #dce8d5; border-radius: 8px; background: #f0f6ed; color: #36563a; font-size: 12.5px; line-height: 1.6; }
+.hddt-note a { color: var(--brand); font-weight: 600; }
 .form-message.is-status { color: var(--muted); }
 .hddt-status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; font-size: 12px; color: var(--muted); }
 

@@ -1880,7 +1880,6 @@
      Tài trợ lương dùng cùng khung nhưng là đăng nhập riêng bằng MST, không lấy hóa đơn.
      Khách tự nhập MST của mình và mật khẩu demo (DEMO_HDDT trong mock-server.js). */
   var hddtForm = { busy: false, done: false, error: '', errorField: '' };
-  var HDDT_ERRORS = { HDDT_INVALID_CREDENTIALS: 'Tài khoản hoặc mật khẩu hóa đơn điện tử không đúng.' };
   var HDDT_ERROR_FIELD = {
     FIELDS_REQUIRED: '', USERNAME_FORMAT: 'hddt-username', HDDT_NOT_OWN: 'hddt-username', NOT_OWN: 'hddt-username',
     HDDT_INVALID_CREDENTIALS: 'hddt-password', INVALID_CREDENTIALS: 'hddt-password'
@@ -1891,9 +1890,13 @@
     open: function (h) { return h.connected; },
     connect: function (username, password) { return api.connectHddt(username, password); }
   };
+  // Tài khoản là MST của doanh nghiệp đang đăng nhập (hiện sẵn, không sửa); khách chỉ nhập mật khẩu.
   var HDDT_COPY = {
     eyebrow: 'Hóa đơn điện tử', heading: 'Kết nối tài khoản hóa đơn điện tử', step1: 'Đăng nhập tài khoản hóa đơn điện tử',
-    formTitle: 'Đăng nhập HĐĐT', userLabel: 'Tài khoản / mã số thuế', userPlaceholder: 'Nhập tài khoản hóa đơn điện tử',
+    formTitle: 'Đăng nhập HĐĐT', userLabel: 'Tài khoản (mã số thuế)',
+    passwordLabel: 'Mật khẩu cổng hóa đơn điện tử', passwordPlaceholder: 'Nhập mật khẩu hoadondientu.gdt.gov.vn',
+    passwordNote: true, passwordRequired: 'Nhập mật khẩu cổng hóa đơn điện tử.',
+    errors: { HDDT_INVALID_CREDENTIALS: 'Mật khẩu cổng hóa đơn điện tử không đúng.' },
     busy: 'Đang đăng nhập cổng hóa đơn điện tử…', done: 'Đã đăng nhập. Đang tải hóa đơn…'
   };
 
@@ -1905,7 +1908,10 @@
     view.load = function () {
       var self = this;
       return access.get().then(function (h) {
-        if (!access.open(h)) return { hddtGate: true, hddt: h };
+        if (!access.open(h)) {
+          if (hddtForm.page !== title) hddtForm = { busy: false, done: false, error: '', errorField: '', page: title };
+          return { hddtGate: true, hddt: h };
+        }
         return load.call(self).then(function (d) { d.hddt = h; return d; });
       });
     };
@@ -1916,21 +1922,21 @@
       if (gated(this)) return hddtGateHtml(title, copy);
       return render.call(this);
     };
-    view.actions['hddt-connect'] = function () { connectHddt(access); };
+    view.actions['hddt-connect'] = function () { connectHddt(access, copy); };
     view.actions['hddt-disconnect'] = function () {
       App.run(api.disconnectHddt().then(function () { App.toast('Đã ngắt kết nối hóa đơn điện tử.'); return App.refresh(); }));
     };
   }
 
-  function connectHddt(access) {
+  function connectHddt(access, copy) {
     if (hddtForm.busy || hddtForm.done) return;
     var userEl = document.getElementById('hddt-username');
     var passEl = document.getElementById('hddt-password');
     var username = userEl.value.trim();
     var password = passEl.value;
-    if (!username || !password) {
-      hddtForm.error = 'Nhập đủ tài khoản và mật khẩu.';
-      hddtForm.errorField = !username ? 'hddt-username' : 'hddt-password';
+    if (!password) {
+      hddtForm.error = copy.passwordRequired;
+      hddtForm.errorField = 'hddt-password';
       App.paint();
       focusHddtField();
       return;
@@ -1951,14 +1957,14 @@
     }).catch(function (error) {
       hddtForm.busy = false;
       hddtForm.done = false;
-      hddtForm.error = HDDT_ERRORS[error.code] || error.message;
+      hddtForm.error = (copy.errors && copy.errors[error.code]) || error.message;
       hddtForm.errorField = HDDT_ERROR_FIELD[error.code] || '';
       App.paint();
       focusHddtField();
     });
   }
   function focusHddtField() {
-    var el = document.getElementById(hddtForm.errorField || 'hddt-username');
+    var el = document.getElementById(hddtForm.errorField || 'hddt-password');
     if (el) el.focus();
   }
 
@@ -1982,12 +1988,17 @@
           <h3>${copy.formTitle}</h3>
           <div class="field">
             <label class="field-label" for="hddt-username">${copy.userLabel}</label>
-            <input class="input" id="hddt-username" data-keep="1" type="text" autocomplete="off" spellcheck="false" placeholder="${copy.userPlaceholder}" aria-invalid="${f.errorField === 'hddt-username' ? 'true' : 'false'}" ${dis}>
+            <input class="input mono" id="hddt-username" type="text" value="${App.me ? App.me.taxCode : ''}" readonly tabindex="-1">
           </div>
           <div class="field">
-            <label class="field-label" for="hddt-password">Mật khẩu</label>
-            <input class="input" id="hddt-password" type="password" autocomplete="new-password" placeholder="Nhập mật khẩu" aria-invalid="${f.errorField === 'hddt-password' ? 'true' : 'false'}" ${dis}>
+            <label class="field-label" for="hddt-password">${copy.passwordLabel}</label>
+            <input class="input" id="hddt-password" type="password" autocomplete="new-password" placeholder="${copy.passwordPlaceholder}" aria-invalid="${f.errorField === 'hddt-password' ? 'true' : 'false'}" ${copy.passwordNote ? App.raw('aria-describedby="hddt-password-note"') : ''} ${dis}>
           </div>
+          ${copy.passwordNote && html`<div class="hddt-note" id="hddt-password-note">
+            Dùng mật khẩu đăng nhập <strong>Cổng hóa đơn điện tử</strong>
+            <a href="https://hoadondientu.gdt.gov.vn/" target="_blank" rel="noopener">hoadondientu.gdt.gov.vn</a>.
+            Không phải mật khẩu trang Thuế điện tử (thuedientu.gdt.gov.vn): đây là hai tài khoản khác nhau.
+          </div>`}
           <p class="form-message ${f.error ? '' : 'is-status'}" role="${f.error ? 'alert' : 'status'}" aria-live="polite">${status || ''}</p>
           <button type="submit" class="btn btn-primary btn-block" ${dis}>Đăng nhập</button>
         </form>
@@ -2021,7 +2032,11 @@
     step3: 'Gửi yêu cầu chi lương',
     formTitle: 'Đăng nhập',
     userLabel: 'Mã số thuế',
-    userPlaceholder: 'Nhập mã số thuế',
+    passwordLabel: 'Mật khẩu',
+    passwordPlaceholder: 'Nhập mật khẩu',
+    passwordNote: false,
+    passwordRequired: 'Nhập mật khẩu.',
+    errors: { INVALID_CREDENTIALS: 'Mật khẩu không đúng.' },
     busy: 'Đang đăng nhập…',
     done: 'Đã đăng nhập. Đang tải…'
   }, {
