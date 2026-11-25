@@ -543,7 +543,19 @@
   }
   // Sản phẩm khách đang dùng (theo B2B); khách mẫu dùng cả ba. Sản phẩm khác hiện xám và không gọi được.
   var ALL_PRODUCTS = ['PF', 'IF', 'RP'];
-  function productsOf(state) { return state.customer.products || ALL_PRODUCTS; }
+  function productsOf(state) {
+    var client = demoClients().find(function (c) { return c.taxCode === state.customer.taxCode; });
+    return (client && client.products) || state.customer.products || ALL_PRODUCTS;
+  }
+  // Phiên đăng nhập từ trước khi có dữ liệu thật (hoặc dữ liệu đã lấy lại): nạp hạn mức + khoản vay mới nhất của khách.
+  function syncClientData(state) {
+    var client = state.customer && demoClients().find(function (c) { return c.taxCode === state.customer.taxCode; });
+    if (!client || !client.overview || state.customer.asOf === client.overview.asOf) return;
+    state.limits = JSON.parse(JSON.stringify(client.overview.limits));
+    state.loans = JSON.parse(JSON.stringify(client.overview.loans));
+    state.customer.asOf = client.overview.asOf;
+    state.customer.products = client.products;
+  }
   function needProduct(state, product) {
     return productsOf(state).indexOf(product) >= 0 ? null : fail(403, 'PRODUCT_NOT_ENABLED', 'Quý khách hàng chưa sử dụng sản phẩm này.');
   }
@@ -1142,6 +1154,7 @@
 
     var state = load();
     var before = JSON.stringify(state);
+    syncClientData(state);
     settleOrders(state);
     var response = fail(404, 'NOT_FOUND', 'Endpoint không tồn tại: ' + method + ' ' + pathname);
     for (var i = 0; i < routes.length; i += 1) {
