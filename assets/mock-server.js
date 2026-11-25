@@ -15,6 +15,41 @@
 
   // Khách hàng test, nạp từ assets/clients.js nếu có: đăng nhập bằng MST của họ thì thấy tên và biểu phí của họ.
   function demoClients() { return root.ADVANCE_DEMO_CLIENTS || []; }
+  // Email đăng nhập của khách test là các email của công ty trên B2B, lưu dạng băm (emailHashes) để không lộ email trong mã trang.
+  var EMAIL_HASH_PREFIX = 'acp-demo|';
+  function emailHash(email) { return sha256Hex(unescape(encodeURIComponent(EMAIL_HASH_PREFIX + email))); }
+  function sha256Hex(ascii) {
+    function rot(v, n) { return (v >>> n) | (v << (32 - n)); }
+    var maxWord = Math.pow(2, 32), words = [], bitLength = ascii.length * 8, hash = [], k = [], primes = 0, composite = {}, i, j;
+    for (var candidate = 2; primes < 64; candidate++) {
+      if (!composite[candidate]) {
+        for (i = 0; i < 313; i += candidate) composite[i] = candidate;
+        hash[primes] = (Math.pow(candidate, 0.5) * maxWord) | 0;
+        k[primes++] = (Math.pow(candidate, 1 / 3) * maxWord) | 0;
+      }
+    }
+    ascii += '\x80';
+    while (ascii.length % 64 - 56) ascii += '\x00';
+    for (i = 0; i < ascii.length; i++) words[i >> 2] |= ascii.charCodeAt(i) << ((3 - i) % 4) * 8;
+    words[words.length] = (bitLength / maxWord) | 0;
+    words[words.length] = bitLength;
+    for (j = 0; j < words.length;) {
+      var w = words.slice(j, j += 16), old = hash;
+      hash = hash.slice(0, 8);
+      for (i = 0; i < 64; i++) {
+        var w15 = w[i - 15], w2 = w[i - 2], a = hash[0], e = hash[4];
+        var t1 = hash[7] + (rot(e, 6) ^ rot(e, 11) ^ rot(e, 25)) + ((e & hash[5]) ^ (~e & hash[6])) + k[i] +
+          (w[i] = i < 16 ? w[i] : (w[i - 16] + (rot(w15, 7) ^ rot(w15, 18) ^ (w15 >>> 3)) + w[i - 7] + (rot(w2, 17) ^ rot(w2, 19) ^ (w2 >>> 10))) | 0);
+        var t2 = (rot(a, 2) ^ rot(a, 13) ^ rot(a, 22)) + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+        hash = [(t1 + t2) | 0].concat(hash);
+        hash[4] = (hash[4] + t1) | 0;
+      }
+      for (i = 0; i < 8; i++) hash[i] = (hash[i] + old[i]) | 0;
+    }
+    var out = '';
+    for (i = 0; i < 8; i++) for (j = 3; j + 1; j--) { var b = (hash[i] >> (j * 8)) & 255; out += (b < 16 ? '0' : '') + b.toString(16); }
+    return out;
+  }
   function packagesFor(state, product, defaults) {
     var fees = state.customer.fees;
     if (!fees) return defaults.map(function (p) { return { tenorDays: p.tenorDays, feeRateMilli: p.feeRateMilli }; });
@@ -36,23 +71,18 @@
     { tenorDays: 90, feeRateMilli: 4950 }
   ];
   function ifFee(amount, feeRateMilli) { return Math.floor((amount * feeRateMilli + 50000) / 100000); }
-  // Gói Payroll Financing và bảng lương mẫu. Bản demo không đọc nội dung tệp tải lên:
-  // tệp nào cũng trả về bảng lương mẫu này. Số mẫu tự đặt.
+  // Gói Tài trợ lương (số mẫu tự đặt) và quy tắc kiểm tra bảng lương theo file mẫu chi lương của B2B
+  // (Disbursement_Template_VN.xlsx, bridge-finance-web utils/vn/template-utility.js).
   var PF_PACKAGES = [
     { tenorDays: 30, feeRateMilli: 1650 },
     { tenorDays: 60, feeRateMilli: 3300 }
   ];
-  var PAYROLL_SAMPLE = (function () {
-    var names = ['Nguyễn Văn An', 'Trần Thị Bình', 'Lê Minh Châu', 'Phạm Quốc Dũng', 'Hoàng Thị Giang', 'Vũ Đức Hải', 'Đặng Thu Hà',
-      'Bùi Anh Khoa', 'Đỗ Thị Lan', 'Ngô Văn Long', 'Dương Thị Mai', 'Lý Hoàng Nam', 'Phan Thị Ngọc', 'Trịnh Văn Phúc', 'Đinh Thị Quỳnh',
-      'Hồ Minh Sơn', 'Mai Thị Tâm', 'Tạ Quang Thái', 'Cao Thị Thảo', 'Lâm Văn Toàn', 'Châu Thị Trang', 'Kiều Minh Tuấn', 'La Thị Uyên',
-      'Quách Văn Vinh', 'Tô Thị Yến'];
-    var banks = ['Vietcombank', 'MSB', 'MB Bank', 'Techcombank', 'BIDV'];
-    return names.map(function (name, i) {
-      return { no: i + 1, name: name, bankName: banks[i % banks.length], accountNo: '****' + String(1000 + (i * 739) % 9000),
-        amount: 12000000 + ((i * 37) % 11) * 1500000 };
-    });
-  })();
+  var PAYROLL_REQUIRED_COLUMNS = ['account_number', 'amount', 'channel_code', 'account_name'];
+  var PAYROLL_MIN_AMOUNT = 10000;
+  var PAYROLL_MAX_AMOUNT = 200000000;
+  var PAYROLL_MAX_BYTES = 5 * 1024 * 1024;
+  // Sheet "VN Channel Code" của file mẫu.
+  var PAYROLL_BANKS = {"VN_ABBANK": "Ngân hàng TMCP An Bình", "VN_ACB": "Ngân hàng TMCP Á Châu", "VN_BACABANK": "Ngân hàng TMCP Bắc Á", "VN_BIDV": "Ngân hàng TMCP Đầu tư và Phát triển Việt Nam", "VN_BVBANK": "Ngân hàng TMCP Bảo Việt", "VN_CIMB": "Ngân hàng CIMB Việt Nam", "VN_COOP": "Ngân hàng Hợp tác xã Việt Nam", "VN_DAB": "Ngân hàng thương mại cổ phần Đông Á", "VN_GPBANK": "Ngân Hàng TM TNHH MTV Dầu Khí Toàn Cầu", "VN_HDBANK": "Ngân hàng TMCP Phát triển TP.Hồ Chí Minh", "VN_HONGLEONG": "Ngân hàng Hong Leong Berhad", "VN_INDOVINA": "Ngân hàng Trách nhiệm hữu hạn Indovina", "VN_IBK": "Ngân hàng Công nghiệp Hàn Quốc", "VN_KIENLONG": "Ngân hàng TMCP Kiên Long", "VN_LPB": "Ngân hàng Thương mại Cổ phần Bưu điện Liên Việt", "VN_MB": "Ngân hàng Thương mại Cổ phần Quân đội", "VN_NAMABANK": "Ngân hàng TMCP Nam Á", "VN_NCB": "Ngân hàng TMCP Quốc Dân", "VN_OCEANBANK": "Ngân hàng TM TNHH MTV Đại Dương", "VN_OCB": "Ngân hàng TMCP Phương Đông", "VN_PGBANK": "Ngân hàng TMCP Xăng dầu Petrolimex", "VN_PBVN": "Ngân hàng TNHH MTV Public Việt Nam", "VN_SHB": "Ngân hàng TMCP Sài Gòn – Hà Nội", "VN_SAIGONBANK": "Ngân hàng TMCP Sài Gòn Công Thương", "VN_SCB": "Ngân hàng Thương Mại Cổ Phần Sài Gòn", "VN_SACOMBANK": "Ngân hàng thương mại cổ phần Sài Gòn Thương Tín", "VN_SHINHAN": "Ngân hàng TNHH Một Thành Viên Shinhan Việt Nam", "VN_SEABANK": "Ngân hàng TMCP Đông Nam Á", "VN_TPBANK": "Ngân hàng Thương mại Cổ phần Tiên Phong", "VN_UOB": "Ngân hàng TNHH một thành viên UOB", "VN_VIETABANK": "Ngân hàng Thương mại Cổ phần Việt Á", "VN_VIETCAPITAL": "Ngân hàng Bản Việt", "VN_VCB": "Ngân hàng TMCP Ngoại Thương Việt Nam", "VN_VIETINBANK": "Ngân hàng Thương mại Cổ phần Công Thương Việt Nam", "VN_AGRIBANK": "Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam", "VN_EXIMBANK": "Ngân hàng Xuất Nhập Khẩu Việt Nam", "VN_VIB": "Ngân hàng Thương mại cổ phần (TMCP) Quốc Tế Việt Nam", "VN_MARITIMEBANK": "Ngân hàng TMCP Hàng Hải Việt Nam", "VN_VPBANK": "Ngân hàng TMCP Việt Nam Thịnh Vượng", "VN_PVCOMBANK": "Ngân hàng Đại Chúng Việt Nam", "VN_VRB": "Ngân hàng Liên doanh Việt – Nga", "VN_TECHCOMBANK": "Ngân hàng TMCP Kỹ Thương", "VN_VIETBANK": "Ngân hàng TMCP Việt Nam Thương Tín", "VN_WOORI": "Ngân hàng Woori Bank"};
   var PAYROLL_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
   var OTP_TRIES = 3;
   var OTP_MAX_SENDS = 5;
@@ -447,10 +477,13 @@
     var body = req.body || {};
     var email = String(body.email || '').trim().toLowerCase();
     var taxCode = digits(body.taxCode);
-    // Bản demo không có email đăng ký của khách: nhận mọi email đúng định dạng, MST phải là khách mẫu hoặc khách test.
+    // MST phải là khách mẫu hoặc khách test; email phải là một email của công ty đó trên B2B (khách mẫu: DEMO_EMAIL).
     var sample = seed().customer;
     var client = demoClients().find(function (c) { return c.taxCode === taxCode; });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (taxCode !== sample.taxCode && !client)) {
+    var emailOk = client
+      ? !client.emailHashes || client.emailHashes.indexOf(emailHash(email)) >= 0
+      : taxCode === sample.taxCode && email === DEMO_EMAIL;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !emailOk) {
       return fail(401, 'INVALID_CREDENTIALS', 'Email hoặc mã số thuế không đúng');
     }
     var customer = client
@@ -819,12 +852,35 @@
     return ok({ items: state.ifRequests.map(function (r) { return ifRequestView(state, r); }) });
   });
 
-  // ---- Payroll Financing: tạo yêu cầu chi lương -> tải bảng lương -> gửi yêu cầu
-  function payrollFileView(file) {
-    return {
-      fileId: file.id, fileName: file.fileName, employeeCount: PAYROLL_SAMPLE.length, totalAmount: file.totalAmount,
-      preview: PAYROLL_SAMPLE.slice(0, 5), moreCount: PAYROLL_SAMPLE.length - 5
+  // ---- Tài trợ lương: tạo yêu cầu chi lương -> tải bảng lương -> gửi yêu cầu.
+  // Bản thật gửi tệp lên backend để đọc; bản demo để trình duyệt đọc tệp thành các dòng (rows) rồi kiểm tra ở đây.
+  function payrollText(value) { return String(value === undefined || value === null ? '' : value).trim(); }
+  function payrollAmount(value) {
+    if (typeof value === 'number') return isFinite(value) ? value : null;
+    var text = payrollText(value).replace(/\s/g, '');
+    if (/^\d+$/.test(text)) return Number(text);
+    if (/^\d{1,3}([.,]\d{3})+$/.test(text)) return Number(text.replace(/[.,]/g, ''));
+    return null;
+  }
+  function checkPayrollRow(cells, col, line) {
+    var get = function (name) { return col[name] === undefined ? '' : cells[col[name]]; };
+    var accountNumber = payrollText(get('account_number')).replace(/\s/g, '');
+    var bankCode = payrollText(get('channel_code')).toUpperCase();
+    var amount = payrollAmount(get('amount'));
+    var row = {
+      line: line, employeeNumber: payrollText(get('employee_number')), accountName: payrollText(get('account_name')),
+      accountNumber: accountNumber, bankCode: bankCode, bankName: PAYROLL_BANKS[bankCode] || '', amount: amount,
+      description: payrollText(get('description')), errors: []
     };
+    if (!row.accountName) row.errors.push('Thiếu tên người nhận');
+    if (!accountNumber) row.errors.push('Thiếu số tài khoản');
+    else if (!/^\d{6,19}$/.test(accountNumber)) row.errors.push('Số tài khoản không hợp lệ');
+    if (!bankCode) row.errors.push('Thiếu mã ngân hàng');
+    else if (!row.bankName) row.errors.push('Mã ngân hàng không có trong sheet VN Channel Code');
+    if (amount === null || payrollText(get('amount')) === '') row.errors.push('Số tiền không hợp lệ');
+    else if (amount < PAYROLL_MIN_AMOUNT) row.errors.push('Số tiền tối thiểu 10.000 VND');
+    else if (amount > PAYROLL_MAX_AMOUNT) row.errors.push('Mỗi người tối đa 200.000.000 VND');
+    return row;
   }
 
   route('GET', '/portal/me/pf/packages', function (state) {
@@ -832,23 +888,46 @@
   });
 
   route('POST', '/portal/me/pf/payroll-files', function (state, req) {
-    var name = String((req.body || {}).fileName || '').trim();
+    if (needHddt(state)) return needHddt(state);
+    var body = req.body || {};
+    var name = payrollText(body.fileName);
     var lower = name.toLowerCase();
     if (!name || !PAYROLL_EXTENSIONS.some(function (ext) { return lower.slice(-ext.length) === ext; })) {
       return fail(422, 'FILE_TYPE_INVALID', 'Bảng lương phải là tệp .xlsx, .xls hoặc .csv.');
     }
+    if (Number(body.fileSize) > PAYROLL_MAX_BYTES) return fail(422, 'FILE_TOO_LARGE', 'Tệp vượt quá 5 MB.');
+    var rows = Array.isArray(body.rows) ? body.rows : [];
+    var header = (rows[0] || []).map(function (h) { return payrollText(h).toLowerCase(); });
+    var col = {};
+    header.forEach(function (h, i) { if (h && col[h] === undefined) col[h] = i; });
+    if (PAYROLL_REQUIRED_COLUMNS.some(function (c) { return col[c] === undefined; })) {
+      return fail(422, 'TEMPLATE_INVALID', 'Bảng lương không đúng file mẫu.');
+    }
+    var checked = [];
+    rows.slice(1).forEach(function (cells, i) {
+      if (!Array.isArray(cells) || cells.every(function (c) { return payrollText(c) === ''; })) return;
+      checked.push(checkPayrollRow(cells, col, i + 2));
+    });
+    if (!checked.length) return fail(422, 'PAYROLL_EMPTY', 'Bảng lương chưa có nhân viên nào.');
+    var errorCount = checked.filter(function (r) { return r.errors.length; }).length;
     var file = {
-      id: nextId(state, 'pfFile', 'BL-'), fileName: name, uploadedAt: nowStamp(), used: false,
-      totalAmount: PAYROLL_SAMPLE.reduce(function (sum, row) { return sum + row.amount; }, 0)
+      id: nextId(state, 'pfFile', 'BL-'), fileName: name, fileSize: Number(body.fileSize) || 0, uploadedAt: nowStamp(), used: false,
+      employeeCount: checked.length, errorCount: errorCount,
+      totalAmount: checked.reduce(function (sum, r) { return sum + (r.amount > 0 ? r.amount : 0); }, 0)
     };
     state.payrollFiles.push(file);
-    return ok(payrollFileView(file));
+    return ok({
+      fileId: file.id, fileName: file.fileName, fileSize: file.fileSize, employeeCount: file.employeeCount,
+      errorCount: errorCount, totalAmount: file.totalAmount, rows: checked
+    });
   });
 
   route('POST', '/portal/me/pf/requests', function (state, req) {
+    if (needHddt(state)) return needHddt(state);
     var body = req.body || {};
     var file = state.payrollFiles.find(function (f) { return f.id === body.fileId; });
     if (!file) return fail(422, 'PAYROLL_FILE_NOT_FOUND', 'Chưa có bảng lương.');
+    if (file.errorCount) return fail(422, 'PAYROLL_FILE_INVALID', 'Bảng lương còn dòng lỗi.');
     if (file.used) return fail(422, 'PAYROLL_FILE_ALREADY_USED', 'Bảng lương này đã được gửi.');
     var pack = packagesFor(state, 'PF', PF_PACKAGES).find(function (p) { return p.tenorDays === Number(body.tenorDays); });
     if (!pack) return fail(422, 'PACKAGE_INVALID', 'Gói không hợp lệ.');
@@ -856,7 +935,7 @@
       return fail(422, 'AMOUNT_OVER_LIMIT', 'Tổng số tiền chi lương vượt quá hạn mức còn lại.', { available: available(state.limits.PF) });
     }
     var request = {
-      id: nextId(state, 'pfReq', 'YCPF-'), fileId: file.id, fileName: file.fileName, employeeCount: PAYROLL_SAMPLE.length,
+      id: nextId(state, 'pfReq', 'YCPF-'), fileId: file.id, fileName: file.fileName, employeeCount: file.employeeCount,
       totalAmount: file.totalAmount, tenorDays: pack.tenorDays, feeRateMilli: pack.feeRateMilli,
       expectedFee: ifFee(file.totalAmount, pack.feeRateMilli), submittedAt: nowStamp(), status: 'SUBMITTED'
     };

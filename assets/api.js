@@ -70,7 +70,8 @@
     connectHddt: function (username, password) { return transport('POST', '/portal/me/hddt/connect', { username: username, password: password }); },
     disconnectHddt: function () { return transport('POST', '/portal/me/hddt/disconnect'); },
     getPfPackages: function () { return transport('GET', '/portal/me/pf/packages'); },
-    uploadPayrollFile: function (file) { return transport('POST', '/portal/me/pf/payroll-files', { fileName: file.fileName, fileSize: file.fileSize }); },
+    // Bản thật gửi tệp (multipart). Bản demo: trình duyệt đã đọc tệp thành các dòng (rows), mảng đầu là dòng tiêu đề.
+    uploadPayrollFile: function (file) { return transport('POST', '/portal/me/pf/payroll-files', { fileName: file.fileName, fileSize: file.fileSize, rows: file.rows }); },
     createPfRequest: function (fileId, tenorDays) { return transport('POST', '/portal/me/pf/requests', { fileId: fileId, tenorDays: tenorDays }); },
     getPfRequests: function () { return transport('GET', '/portal/me/pf/requests'); },
     getIfRequests: function () { return transport('GET', '/portal/me/if/requests'); },

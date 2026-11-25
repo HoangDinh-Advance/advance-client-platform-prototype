@@ -1569,9 +1569,32 @@
   /* ================================================================== Tài trợ lương: tạo yêu cầu chi lương */
   var PF_ERRORS = {
     FILE_TYPE_INVALID: 'Bảng lương phải là tệp .xlsx, .xls hoặc .csv.',
+    FILE_TOO_LARGE: 'Tệp vượt quá 5 MB.',
+    FILE_UNREADABLE: 'Không đọc được tệp. Vui lòng kiểm tra lại tệp bảng lương.',
+    TEMPLATE_INVALID: 'Bảng lương không đúng file mẫu. Vui lòng tải file mẫu và điền đúng các cột.',
+    PAYROLL_EMPTY: 'Bảng lương chưa có nhân viên nào.',
+    PAYROLL_FILE_INVALID: 'Bảng lương còn dòng lỗi. Vui lòng sửa trong tệp rồi tải lên lại.',
     AMOUNT_OVER_LIMIT: 'Tổng số tiền chi lương vượt quá hạn mức Tài trợ lương còn lại.',
     PAYROLL_FILE_ALREADY_USED: 'Bảng lương này đã được gửi. Vui lòng đóng cửa sổ và tạo yêu cầu mới.'
   };
+  // File mẫu = file chi lương của B2B (Disbursement_Template_VN.xlsx) điền sẵn 25 nhân viên mẫu, tạo bằng tools/make_payroll_template.py.
+  var PAYROLL_TEMPLATE = { url: 'assets/File-chi-luong-mau.xlsx', name: 'File-chi-luong-mau.xlsx', sheet: 'Disbursement Template' };
+  var PAYROLL_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
+  var PAYROLL_MAX_BYTES = 5 * 1024 * 1024;
+  // Artifact không đính kèm được .xlsx: bản build artifact nhúng file mẫu vào window.PAYROLL_TEMPLATE_B64.
+  function payrollTemplateBlob() {
+    var type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if (window.PAYROLL_TEMPLATE_B64) {
+      var bin = atob(window.PAYROLL_TEMPLATE_B64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return Promise.resolve(new Blob([bytes], { type: type }));
+    }
+    return fetch(PAYROLL_TEMPLATE.url).then(function (response) {
+      if (!response.ok) throw new Error('template');
+      return response.blob();
+    });
+  }
 
   var pf = App.views['payroll-financing'] = {
     mode: 'portal', nav: 'payroll-financing',
@@ -1599,7 +1622,7 @@
           <td><span class="tag ${status.cls}">${status.label}</span></td>
         </tr>`;
       });
-      return html`<div class="page-head"><h1>Tài trợ lương</h1>
+      return html`<div class="page-head"><h1>Tài trợ lương</h1>${hddtStatusHtml(d)}
           <button type="button" class="btn btn-primary" data-act="pf-open">Tạo yêu cầu chi lương</button></div>
         <section class="card" aria-labelledby="pf-history-title">
           <div class="card-head"><h2 id="pf-history-title">Lịch sử yêu cầu</h2></div>
@@ -1614,17 +1637,35 @@
     actions: {
       'pf-open': function () {
         pf.state.flow = {
-          step: 'upload', file: null, uploading: false, error: '', packages: pf.data.packages,
+          step: 'upload', file: null, uploading: false, pending: '', templating: false, errorsOnly: false, error: '', packages: pf.data.packages,
           tenorDays: defaultTenor(pf.data.packages), available: pf.data.limit.available, sending: false, result: null
         };
-        App.openDialog({ render: pfDialogHtml, locked: function () { var f = pf.state.flow; return f && (f.sending || f.uploading); } });
+        App.openDialog({ wide: true, render: pfDialogHtml, locked: function () { var f = pf.state.flow; return f && (f.sending || f.uploading); } });
       },
       'pf-file': function (el) {
         var picked = el.files && el.files[0];
-        if (picked) pfUpload({ fileName: picked.name, fileSize: picked.size });
+        el.value = '';
+        if (picked) pfUpload(picked);
       },
-      'pf-sample': function () { pfUpload({ fileName: 'Bang-luong-thang-11-2026.xlsx', fileSize: 18432 }); },
-      'pf-clear': function () { pf.state.flow.file = null; pf.state.flow.error = ''; App.paintDialog(); },
+      'pf-template': function () {
+        var f = pf.state.flow;
+        if (f.templating) return;
+        f.templating = true;
+        App.paintDialog();
+        payrollTemplateBlob().then(function (blob) {
+          return App.saveFile(PAYROLL_TEMPLATE.name, blob);
+        }).then(function () {
+          App.toast('Đã tải file mẫu bảng lương.');
+        }).catch(function (error) {
+          if (error && error.code === 'declined') return;
+          App.toast('Không tải được file mẫu. Vui lòng thử lại.', true);
+        }).then(function () {
+          f.templating = false;
+          App.paintDialog();
+        });
+      },
+      'pf-errors-only': function (el) { pf.state.flow.errorsOnly = el.getAttribute('data-only') === '1'; App.paintDialog(); },
+      'pf-clear': function () { var f = pf.state.flow; f.file = null; f.error = ''; f.errorsOnly = false; App.paintDialog(); },
       'pf-next': function () {
         var f = pf.state.flow;
         f.error = f.file.totalAmount > f.available ? PF_ERRORS.AMOUNT_OVER_LIMIT : '';
@@ -1654,12 +1695,32 @@
     }
   };
 
-  function pfUpload(meta) {
+  // Đọc tệp ngay trên trình duyệt (SheetJS) thành các dòng rồi gửi qua api; tệp sai đuôi/quá lớn để server báo lỗi.
+  function readPayrollRows(picked) {
+    var lower = picked.name.toLowerCase();
+    var readable = picked.size <= PAYROLL_MAX_BYTES && PAYROLL_EXTENSIONS.some(function (ext) { return lower.slice(-ext.length) === ext; });
+    if (!readable) return Promise.resolve([]);
+    return App.loadScript(SHEETJS_URL).then(function () { return picked.arrayBuffer(); }).then(function (buffer) {
+      var XLSX = window.XLSX;
+      var book = XLSX.read(buffer, { type: 'array' });
+      var sheet = book.Sheets[PAYROLL_TEMPLATE.sheet] || book.Sheets[book.SheetNames[0]];
+      return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '', blankrows: false });
+    }).catch(function () {
+      throw { code: 'FILE_UNREADABLE' };
+    });
+  }
+
+  function pfUpload(picked) {
     var f = pf.state.flow;
+    if (!f || f.uploading) return;
     f.uploading = true;
+    f.pending = picked.name;
     f.error = '';
+    f.errorsOnly = false;
     App.paintDialog();
-    api.uploadPayrollFile(meta).then(function (file) {
+    readPayrollRows(picked).then(function (rows) {
+      return api.uploadPayrollFile({ fileName: picked.name, fileSize: picked.size, rows: rows });
+    }).then(function (file) {
       f.uploading = false;
       f.file = file;
       App.paintDialog();
@@ -1668,6 +1729,99 @@
       f.error = PF_ERRORS[error.code] || error.message;
       App.paintDialog();
     });
+  }
+
+  function pfDropZone(event) {
+    return event.target && event.target.closest ? event.target.closest('[data-drop="pf-file"]') : null;
+  }
+  ['dragenter', 'dragover'].forEach(function (type) {
+    document.addEventListener(type, function (event) {
+      if (!pf.state.flow) return;
+      event.preventDefault();
+      var zone = pfDropZone(event);
+      if (zone && !pf.state.flow.uploading) zone.classList.add('is-over');
+    });
+  });
+  document.addEventListener('dragleave', function (event) {
+    var zone = pfDropZone(event);
+    if (zone && !zone.contains(event.relatedTarget)) zone.classList.remove('is-over');
+  });
+  document.addEventListener('drop', function (event) {
+    if (!pf.state.flow) return;
+    event.preventDefault();
+    var zone = pfDropZone(event);
+    if (!zone) return;
+    zone.classList.remove('is-over');
+    var picked = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+    if (picked) pfUpload(picked);
+  });
+
+  function fileSizeText(bytes) {
+    if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1).replace('.', ',') + ' MB';
+    return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  }
+  var DOWNLOAD_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>';
+  var UPLOAD_ICON = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>';
+
+  function pfPickHtml(f) {
+    var dis = f.uploading ? App.raw('disabled') : '';
+    return html`<ol class="pf-steps">
+        <li class="pf-step">
+          <span class="step-number">01</span>
+          <span class="pf-step-title">Tải file mẫu bảng lương</span>
+          <button type="button" class="btn btn-outline btn-sm" data-act="pf-template" ${f.templating ? App.raw('disabled') : ''}>${App.raw(DOWNLOAD_ICON)}${f.templating ? 'Đang tải…' : PAYROLL_TEMPLATE.name}</button>
+        </li>
+        <li class="pf-step">
+          <span class="step-number">02</span>
+          <span class="pf-step-title">Tải lên bảng lương đã điền</span>
+        </li>
+      </ol>
+      <label class="dropzone ${f.uploading ? 'is-busy' : ''}" data-drop="pf-file">
+        <input type="file" id="pf-file" accept=".xlsx,.xls,.csv" data-change="pf-file" ${dis}>
+        <span class="dropzone-icon">${App.raw(UPLOAD_ICON)}</span>
+        ${f.uploading
+          ? html`<span class="dropzone-title">Đang kiểm tra bảng lương…</span><span class="dropzone-hint">${f.pending}</span>`
+          : html`<span class="dropzone-title">Kéo thả tệp vào đây hoặc <span class="dropzone-link">chọn tệp</span></span><span class="dropzone-hint">.xlsx, .xls, .csv · tối đa 5 MB</span>`}
+      </label>`;
+  }
+
+  function pfCheckedHtml(f) {
+    var file = f.file;
+    var errorRows = file.rows.filter(function (r) { return r.errors.length; });
+    var shown = f.errorsOnly ? errorRows : file.rows;
+    return html`<div class="file-chip">
+        <span class="file-badge" aria-hidden="true">${(file.fileName.split('.').pop() || '').toUpperCase()}</span>
+        <span class="file-chip-main"><span class="file-chip-name">${file.fileName}</span><span class="file-chip-meta">${fileSizeText(file.fileSize)}</span></span>
+        <button type="button" class="btn btn-outline btn-sm" data-act="pf-clear">Chọn tệp khác</button>
+      </div>
+      <dl class="pf-summary">
+        <div><dt>Số nhân viên</dt><dd class="mono">${file.employeeCount}</dd></div>
+        <div><dt>Tổng số tiền chi lương</dt><dd class="mono nowrap">${vn(file.totalAmount)} VND</dd></div>
+        <div><dt>Dòng hợp lệ</dt><dd class="mono">${file.employeeCount - file.errorCount}</dd></div>
+        <div class="${file.errorCount ? 'is-bad' : ''}"><dt>Dòng lỗi</dt><dd class="mono">${file.errorCount}</dd></div>
+      </dl>
+      ${file.errorCount > 0 && html`<p class="banner banner-danger" role="alert">Có ${file.errorCount} dòng lỗi. Vui lòng sửa trong tệp rồi tải lên lại.</p>
+        <div class="sale-tabs pf-filter" role="tablist" aria-label="Lọc dòng">
+          <button type="button" role="tab" class="sale-tab" data-act="pf-errors-only" data-only="0" aria-selected="${f.errorsOnly ? 'false' : 'true'}">Tất cả<span>${file.employeeCount}</span></button>
+          <button type="button" role="tab" class="sale-tab" data-act="pf-errors-only" data-only="1" aria-selected="${f.errorsOnly ? 'true' : 'false'}">Dòng lỗi<span>${file.errorCount}</span></button>
+        </div>`}
+      <div class="table-wrap pf-table-wrap" id="pf-preview-wrap">
+        <table class="data-table pf-table">
+          <thead><tr><th class="num">Dòng</th><th>Kiểm tra</th><th>Mã NV</th><th>Tên người nhận</th><th>Ngân hàng</th><th>Số tài khoản</th><th class="num">Số tiền (VND)</th><th>Nội dung</th></tr></thead>
+          <tbody>${shown.map(function (r) {
+            return html`<tr class="${r.errors.length ? 'is-error' : ''}">
+              <td class="num mono">${r.line}</td>
+              <td class="check">${r.errors.length ? html`<span class="row-errors">${r.errors.join('; ')}</span>` : html`<span class="tag tag-ok">Hợp lệ</span>`}</td>
+              <td class="mono nowrap">${r.employeeNumber || '—'}</td>
+              <td>${r.accountName || '—'}</td>
+              <td class="bank">${r.bankName || r.bankCode || '—'}</td>
+              <td class="mono nowrap">${r.accountNumber || '—'}</td>
+              <td class="num nowrap">${r.amount === null ? '—' : vn(r.amount)}</td>
+              <td>${r.description || '—'}</td>
+            </tr>`;
+          })}</tbody>
+        </table>
+      </div>`;
   }
 
   function pfDialogHtml() {
@@ -1712,41 +1866,18 @@
     return html`<div class="modal-body">
       <div class="eyebrow">Tài trợ lương</div>
       <h2 id="dialog-title">Tạo yêu cầu chi lương</h2>
-      ${f.file ? html`<dl class="facts box">
-          <div><dt>Bảng lương</dt><dd>${f.file.fileName}</dd></div>
-          <div><dt>Số nhân viên</dt><dd class="mono">${f.file.employeeCount}</dd></div>
-          <div><dt>Tổng số tiền chi lương</dt><dd class="mono">${vn(f.file.totalAmount)} VND</dd></div>
-        </dl>
-        <div class="sale-table table-wrap" id="pf-preview-wrap">
-          <table class="data-table" style="min-width: 440px">
-            <thead><tr><th>STT</th><th>Họ và tên</th><th>Ngân hàng</th><th>Số tài khoản</th><th class="num">Số tiền (VND)</th></tr></thead>
-            <tbody>${f.file.preview.map(function (row) {
-              return html`<tr><td class="mono">${row.no}</td><td>${row.name}</td><td>${row.bankName}</td><td class="mono">${row.accountNo}</td><td class="num">${vn(row.amount)}</td></tr>`;
-            })}</tbody>
-            <tfoot><tr><td colspan="5">và ${f.file.moreCount} nhân viên khác</td></tr></tfoot>
-          </table>
-        </div>
-        <button type="button" class="text-button" data-act="pf-clear">Chọn bảng lương khác</button>`
-      : html`<div class="upload-box">
-          <div class="upload-title">Tải lên bảng lương</div>
-          <div class="upload-hint">${f.uploading ? 'Đang đọc bảng lương…' : 'Tệp .xlsx, .xls hoặc .csv'}</div>
-          <div class="upload-actions">
-            <label class="btn btn-primary file-pick ${f.uploading ? 'is-disabled' : ''}">Chọn tệp
-              <input type="file" id="pf-file" accept=".xlsx,.xls,.csv" data-change="pf-file" ${f.uploading ? App.raw('disabled') : ''}></label>
-            <button type="button" class="btn btn-outline" data-act="pf-sample" ${f.uploading ? App.raw('disabled') : ''}>Dùng bảng lương mẫu</button>
-          </div>
-        </div>`}
+      ${f.file ? pfCheckedHtml(f) : pfPickHtml(f)}
       ${f.error && html`<p class="banner banner-danger" role="alert">${f.error}</p>`}
       <div class="modal-actions">
         <button type="button" class="btn btn-outline" data-act="pf-close" ${f.uploading ? App.raw('disabled') : ''}>Đóng</button>
-        <button type="button" class="btn btn-primary" data-act="pf-next" ${f.file ? '' : App.raw('disabled')}>Tiếp tục</button>
+        <button type="button" class="btn btn-primary" data-act="pf-next" ${f.file && !f.file.errorCount ? '' : App.raw('disabled')}>Tiếp tục</button>
       </div>
     </div>`;
   }
 
   /* ================================================================== Kết nối hóa đơn điện tử
-     Mua bán nợ và Tài trợ hóa đơn cần hóa đơn từ cổng thuế: chưa kết nối thì hiện màn đăng nhập HĐĐT thay cho trang.
-     Bản demo điền sẵn tài khoản mẫu và khóa chỉnh sửa, như prototype cổng HĐĐT trước đây. */
+     Mua bán nợ, Tài trợ hóa đơn và Tài trợ lương: chưa kết nối cổng thuế thì hiện màn đăng nhập HĐĐT thay cho trang.
+     Khách tự nhập MST của mình và mật khẩu demo (DEMO_HDDT trong mock-server.js). */
   var hddtForm = { busy: false, done: false, error: '', errorField: '' };
   var HDDT_ERRORS = { HDDT_INVALID_CREDENTIALS: 'Tài khoản hoặc mật khẩu hóa đơn điện tử không đúng.' };
   var HDDT_ERROR_FIELD = { FIELDS_REQUIRED: '', USERNAME_FORMAT: 'hddt-username', HDDT_NOT_OWN: 'hddt-username', HDDT_INVALID_CREDENTIALS: 'hddt-password' };
@@ -1762,8 +1893,8 @@
       });
     };
     view.onData = function () { if (!gated(this) && onData) onData.call(this); };
-    view.hasBar = function () { return !gated(this) && hasBar.call(this); };
-    view.renderBar = function () { return gated(this) ? '' : renderBar.call(this); };
+    view.hasBar = function () { return !gated(this) && !!hasBar && hasBar.call(this); };
+    view.renderBar = function () { return gated(this) || !renderBar ? '' : renderBar.call(this); };
     view.render = function () {
       if (gated(this)) return hddtGateHtml(title, copy);
       return render.call(this);
@@ -1862,5 +1993,10 @@
     lead: 'Kết nối một lần, hệ thống tự lấy hóa đơn đầu vào từ cổng hóa đơn điện tử. Quý khách không cần gửi hóa đơn qua email.',
     step2: 'Hệ thống lấy hóa đơn đầu vào',
     step3: 'Chọn hóa đơn để tài trợ'
+  });
+  gateWithHddt(pf, 'Tài trợ lương', {
+    lead: 'Kết nối một lần, hệ thống tự lấy hóa đơn đầu ra và đầu vào từ cổng hóa đơn điện tử. Quý khách không cần gửi hóa đơn qua email.',
+    step2: 'Hệ thống lấy hóa đơn đầu ra và đầu vào',
+    step3: 'Tạo yêu cầu chi lương'
   });
 })();
