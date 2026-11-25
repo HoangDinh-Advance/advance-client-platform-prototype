@@ -1895,7 +1895,7 @@
     eyebrow: 'Hóa đơn điện tử', heading: 'Kết nối tài khoản hóa đơn điện tử', step1: 'Đăng nhập tài khoản hóa đơn điện tử (hoadondientu.gdt.gov.vn)',
     formTitle: 'Đăng nhập HĐĐT', userLabel: 'Tài khoản (mã số thuế)',
     passwordLabel: 'Mật khẩu', passwordPlaceholder: 'Nhập mật khẩu',
-    passwordNote: true, noteFocus: 'đăng nhập và sử dụng sản phẩm của Advance', passwordRequired: 'Quý khách hàng vui lòng nhập mật khẩu.',
+    passwordNote: true, noteFocus: 'sử dụng sản phẩm của Advance', passwordRequired: 'Quý khách hàng vui lòng nhập mật khẩu.',
     errors: { HDDT_INVALID_CREDENTIALS: 'Mật khẩu chưa đúng. Quý khách hàng vui lòng kiểm tra lại.' },
     busy: 'Đang đăng nhập cổng hóa đơn điện tử…', done: 'Đã đăng nhập. Đang tải hóa đơn…'
   };
@@ -1994,7 +1994,7 @@
             <label class="field-label" for="hddt-password">${copy.passwordLabel}</label>
             <input class="input" id="hddt-password" type="password" autocomplete="new-password" placeholder="${copy.passwordPlaceholder}" aria-invalid="${f.errorField === 'hddt-password' ? 'true' : 'false'}" ${copy.passwordNote ? App.raw('aria-describedby="hddt-password-note"') : ''} ${dis}>
           </div>
-          ${copy.passwordNote && html`<p class="hddt-note" id="hddt-password-note">Quý khách hàng vui lòng nhập mật khẩu Cổng hóa đơn điện tử hoadondientu.gdt.gov.vn dùng để <span>${copy.noteFocus}</span>.</p>`}
+          ${copy.passwordNote && html`<p class="hddt-note" id="hddt-password-note">Quý khách hàng đăng nhập bằng tài khoản Cổng hóa đơn điện tử hoadondientu.gdt.gov.vn để <span>${copy.noteFocus}</span>.</p>`}
           <p class="form-message ${f.error ? '' : 'is-status'}" role="${f.error ? 'alert' : 'status'}" aria-live="polite">${status || ''}</p>
           <button type="submit" class="btn btn-primary btn-block" ${dis}>Đăng nhập</button>
         </form>
@@ -2031,7 +2031,7 @@
     passwordLabel: 'Mật khẩu',
     passwordPlaceholder: 'Nhập mật khẩu',
     passwordNote: true,
-    noteFocus: 'đăng nhập và sử dụng sản phẩm Tài trợ lương của Advance',
+    noteFocus: 'sử dụng sản phẩm Tài trợ lương của Advance',
     passwordRequired: 'Quý khách hàng vui lòng nhập mật khẩu.',
     errors: { INVALID_CREDENTIALS: 'Mật khẩu chưa đúng. Quý khách hàng vui lòng kiểm tra lại.' },
     busy: 'Đang đăng nhập…',
