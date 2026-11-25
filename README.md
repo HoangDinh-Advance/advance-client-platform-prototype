@@ -13,7 +13,7 @@ Trang tĩnh thuần HTML/CSS/JS, không cần build.
 
 Đăng nhập chỉ bằng email: bất kỳ email nào của doanh nghiệp đã đăng ký với Advance trên B2B (chủ, kế toán, …), lưu dạng băm `emailHashes` trong `assets/clients.js`; khách mẫu dùng `ketoan.mauanphuc@gmail.com`. Mã OTP gửi tới email đó. Bản demo không gửi email thật: mã OTP điền sẵn `123456`, nhập đủ 6 số bất kỳ là đúng, toàn số 0 là sai.
 
-Biểu phí (Gói của Tài trợ lương, Tài trợ hóa đơn và mức chiết khấu Mua bán nợ) đi theo khách đang đăng nhập. Danh sách 19 khách test và biểu phí của họ (lấy từ B2B ngày 23/11/2026) nằm ở `assets/clients.js`; khách mẫu `0100000001` dùng biểu phí mẫu, MST khác không đăng nhập được.
+Biểu phí (Gói của Tài trợ lương, Tài trợ hóa đơn và mức chiết khấu Mua bán nợ) đi theo khách đang đăng nhập. Danh sách 19 khách test và biểu phí của họ (biểu phí lấy từ B2B ngày 23/11/2026, email từ bản chụp B2B 23/10/2026 trên BigQuery) nằm ở `assets/clients.js`; khách mẫu `0100000001` dùng biểu phí mẫu, MST khác không đăng nhập được.
 
 Vào **Mua bán nợ** hoặc **Tài trợ hóa đơn** lần đầu sẽ gặp thêm lớp **Đăng nhập HĐĐT** (tài khoản / mã số thuế + mật khẩu hóa đơn điện tử), giống prototype cổng HĐĐT trước đây. Tài khoản là MST của doanh nghiệp đang đăng nhập, hiện sẵn; khách chỉ nhập mật khẩu Cổng hóa đơn điện tử (hoadondientu.gdt.gov.vn, khác tài khoản Thuế điện tử), bản demo là `123456`; bản demo không gọi cổng thuế và không giữ mật khẩu. Kết nối một lần dùng chung cho cả hai sản phẩm, giữ đến khi bấm Ngắt kết nối hoặc Đặt lại demo.
 
