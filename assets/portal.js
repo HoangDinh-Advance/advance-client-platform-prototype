@@ -1995,9 +1995,8 @@
             <input class="input" id="hddt-password" type="password" autocomplete="new-password" placeholder="${copy.passwordPlaceholder}" aria-invalid="${f.errorField === 'hddt-password' ? 'true' : 'false'}" ${copy.passwordNote ? App.raw('aria-describedby="hddt-password-note"') : ''} ${dis}>
           </div>
           ${copy.passwordNote && html`<div class="hddt-note" id="hddt-password-note">
-            Dùng mật khẩu đăng nhập <strong>Cổng hóa đơn điện tử</strong>
+            Quý khách hàng vui lòng nhập mật khẩu dùng để đăng nhập <strong>Cổng hóa đơn điện tử</strong>
             <a href="https://hoadondientu.gdt.gov.vn/" target="_blank" rel="noopener">hoadondientu.gdt.gov.vn</a>.
-            Không phải mật khẩu trang Thuế điện tử (thuedientu.gdt.gov.vn): đây là hai tài khoản khác nhau.
           </div>`}
           <p class="form-message ${f.error ? '' : 'is-status'}" role="${f.error ? 'alert' : 'status'}" aria-live="polite">${status || ''}</p>
           <button type="submit" class="btn btn-primary btn-block" ${dis}>Đăng nhập</button>

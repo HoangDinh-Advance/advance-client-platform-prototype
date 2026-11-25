@@ -15,7 +15,7 @@ Trang tĩnh thuần HTML/CSS/JS, không cần build.
 
 Biểu phí (Gói của Tài trợ lương, Tài trợ hóa đơn và mức chiết khấu Mua bán nợ) đi theo khách đang đăng nhập. Danh sách 19 khách test và biểu phí của họ (biểu phí lấy từ B2B ngày 23/11/2026, email từ bản chụp B2B 23/10/2026 trên BigQuery) nằm ở `assets/clients.js`; khách mẫu `0100000001` dùng biểu phí mẫu, MST khác không đăng nhập được.
 
-Vào **Mua bán nợ** hoặc **Tài trợ hóa đơn** lần đầu sẽ gặp thêm lớp **Đăng nhập HĐĐT** (tài khoản / mã số thuế + mật khẩu hóa đơn điện tử), giống prototype cổng HĐĐT trước đây. Tài khoản là MST của doanh nghiệp đang đăng nhập, hiện sẵn; khách chỉ nhập mật khẩu Cổng hóa đơn điện tử (hoadondientu.gdt.gov.vn, khác tài khoản Thuế điện tử), bản demo là `123456`; bản demo không gọi cổng thuế và không giữ mật khẩu. Kết nối một lần dùng chung cho cả hai sản phẩm, giữ đến khi bấm Ngắt kết nối hoặc Đặt lại demo.
+Vào **Mua bán nợ** hoặc **Tài trợ hóa đơn** lần đầu sẽ gặp thêm lớp **Đăng nhập HĐĐT** (tài khoản / mã số thuế + mật khẩu hóa đơn điện tử), giống prototype cổng HĐĐT trước đây. Tài khoản là MST của doanh nghiệp đang đăng nhập, hiện sẵn; khách chỉ nhập mật khẩu Cổng hóa đơn điện tử (hoadondientu.gdt.gov.vn), bản demo là `123456`; bản demo không gọi cổng thuế và không giữ mật khẩu. Kết nối một lần dùng chung cho cả hai sản phẩm, giữ đến khi bấm Ngắt kết nối hoặc Đặt lại demo.
 
 **Tài trợ lương** có màn đăng nhập riêng (MST hiện sẵn + mật khẩu demo `123456`), chỉ để dùng sản phẩm lương: không lấy hóa đơn và không mở Mua bán nợ / Tài trợ hóa đơn.
 
