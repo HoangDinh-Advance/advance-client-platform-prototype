@@ -15,7 +15,7 @@
   ApiError.prototype = Object.create(Error.prototype);
 
   var LATENCY_MS = 350;
-  var SLOW = { 'POST /portal/me/rp/debit-auth': 1200, 'POST /portal/me/pf/payroll-files': 1000, 'POST /portal/me/rp/sale-requests/quote': 150, 'POST /portal/me/hddt/connect': 1800 };
+  var SLOW = { 'POST /portal/me/rp/debit-auth': 1200, 'POST /portal/me/pf/payroll-files': 1000, 'POST /portal/me/rp/sale-requests/quote': 150, 'POST /portal/me/hddt/connect': 1800, 'POST /portal/me/pf/access': 900 };
 
   /* Mock transport. Bản thật: return fetch(BASE_URL + path, { method, headers, body: JSON.stringify(body) }) ... */
   function transport(method, path, body) {
@@ -69,6 +69,8 @@
     getHddt: function () { return transport('GET', '/portal/me/hddt'); },
     connectHddt: function (username, password) { return transport('POST', '/portal/me/hddt/connect', { username: username, password: password }); },
     disconnectHddt: function () { return transport('POST', '/portal/me/hddt/disconnect'); },
+    getPfAccess: function () { return transport('GET', '/portal/me/pf/access'); },
+    loginPf: function (username, password) { return transport('POST', '/portal/me/pf/access', { username: username, password: password }); },
     getPfPackages: function () { return transport('GET', '/portal/me/pf/packages'); },
     // Bản thật gửi tệp (multipart). Bản demo: trình duyệt đã đọc tệp thành các dòng (rows), mảng đầu là dòng tiêu đề.
     uploadPayrollFile: function (file) { return transport('POST', '/portal/me/pf/payroll-files', { fileName: file.fileName, fileSize: file.fileSize, rows: file.rows }); },

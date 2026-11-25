@@ -1876,19 +1876,36 @@
   }
 
   /* ================================================================== Kết nối hóa đơn điện tử
-     Mua bán nợ, Tài trợ hóa đơn và Tài trợ lương: chưa kết nối cổng thuế thì hiện màn đăng nhập HĐĐT thay cho trang.
+     Mua bán nợ và Tài trợ hóa đơn: chưa kết nối cổng thuế thì hiện màn đăng nhập HĐĐT thay cho trang.
+     Tài trợ lương dùng cùng khung nhưng là đăng nhập riêng bằng MST, không lấy hóa đơn.
      Khách tự nhập MST của mình và mật khẩu demo (DEMO_HDDT trong mock-server.js). */
   var hddtForm = { busy: false, done: false, error: '', errorField: '' };
   var HDDT_ERRORS = { HDDT_INVALID_CREDENTIALS: 'Tài khoản hoặc mật khẩu hóa đơn điện tử không đúng.' };
-  var HDDT_ERROR_FIELD = { FIELDS_REQUIRED: '', USERNAME_FORMAT: 'hddt-username', HDDT_NOT_OWN: 'hddt-username', HDDT_INVALID_CREDENTIALS: 'hddt-password' };
+  var HDDT_ERROR_FIELD = {
+    FIELDS_REQUIRED: '', USERNAME_FORMAT: 'hddt-username', HDDT_NOT_OWN: 'hddt-username', NOT_OWN: 'hddt-username',
+    HDDT_INVALID_CREDENTIALS: 'hddt-password', INVALID_CREDENTIALS: 'hddt-password'
+  };
+  // Cổng đăng nhập trước trang: mặc định là kết nối HĐĐT; Tài trợ lương truyền access + câu chữ riêng.
+  var HDDT_ACCESS = {
+    get: function () { return api.getHddt(); },
+    open: function (h) { return h.connected; },
+    connect: function (username, password) { return api.connectHddt(username, password); }
+  };
+  var HDDT_COPY = {
+    eyebrow: 'Hóa đơn điện tử', heading: 'Kết nối tài khoản hóa đơn điện tử', step1: 'Đăng nhập tài khoản hóa đơn điện tử',
+    formTitle: 'Đăng nhập HĐĐT', userLabel: 'Tài khoản / mã số thuế', userPlaceholder: 'Nhập tài khoản hóa đơn điện tử',
+    busy: 'Đang đăng nhập cổng hóa đơn điện tử…', done: 'Đã đăng nhập. Đang tải hóa đơn…'
+  };
 
-  function gateWithHddt(view, title, copy) {
+  function gateWithHddt(view, title, pageCopy, access) {
     var load = view.load, render = view.render, onData = view.onData, hasBar = view.hasBar, renderBar = view.renderBar;
+    var copy = Object.assign({}, HDDT_COPY, pageCopy);
+    access = access || HDDT_ACCESS;
     function gated(v) { return !!(v.data && v.data.hddtGate); }
     view.load = function () {
       var self = this;
-      return api.getHddt().then(function (h) {
-        if (!h.connected) return { hddtGate: true, hddt: h };
+      return access.get().then(function (h) {
+        if (!access.open(h)) return { hddtGate: true, hddt: h };
         return load.call(self).then(function (d) { d.hddt = h; return d; });
       });
     };
@@ -1899,13 +1916,13 @@
       if (gated(this)) return hddtGateHtml(title, copy);
       return render.call(this);
     };
-    view.actions['hddt-connect'] = connectHddt;
+    view.actions['hddt-connect'] = function () { connectHddt(access); };
     view.actions['hddt-disconnect'] = function () {
       App.run(api.disconnectHddt().then(function () { App.toast('Đã ngắt kết nối hóa đơn điện tử.'); return App.refresh(); }));
     };
   }
 
-  function connectHddt() {
+  function connectHddt(access) {
     if (hddtForm.busy || hddtForm.done) return;
     var userEl = document.getElementById('hddt-username');
     var passEl = document.getElementById('hddt-password');
@@ -1924,7 +1941,7 @@
     hddtForm.error = '';
     hddtForm.errorField = '';
     App.paint();
-    api.connectHddt(username, password).then(function () {
+    access.connect(username, password).then(function () {
       hddtForm.busy = false;
       hddtForm.done = true;
       App.paint();
@@ -1947,25 +1964,25 @@
 
   function hddtGateHtml(title, copy) {
     var f = hddtForm;
-    var status = f.done ? 'Đã đăng nhập. Đang tải hóa đơn…' : f.busy ? 'Đang đăng nhập cổng hóa đơn điện tử…' : f.error;
+    var status = f.done ? copy.done : f.busy ? copy.busy : f.error;
     var dis = f.busy || f.done ? App.raw('disabled') : '';
     return html`<div class="page-head"><h1>${title}</h1></div>
       <section class="card hddt-gate" aria-labelledby="hddt-title">
         <div class="hddt-intro">
-          <div class="eyebrow">Hóa đơn điện tử</div>
-          <h2 id="hddt-title">Kết nối tài khoản hóa đơn điện tử</h2>
+          <div class="eyebrow">${copy.eyebrow}</div>
+          <h2 id="hddt-title">${copy.heading}</h2>
           <p>${copy.lead}</p>
           <ol class="hddt-steps">
-            <li><span class="step-number">01</span>Đăng nhập tài khoản hóa đơn điện tử</li>
+            <li><span class="step-number">01</span>${copy.step1}</li>
             <li><span class="step-number">02</span>${copy.step2}</li>
             <li><span class="step-number">03</span>${copy.step3}</li>
           </ol>
         </div>
         <form class="hddt-form" data-submit="hddt-connect" novalidate autocomplete="off">
-          <h3>Đăng nhập HĐĐT</h3>
+          <h3>${copy.formTitle}</h3>
           <div class="field">
-            <label class="field-label" for="hddt-username">Tài khoản / mã số thuế</label>
-            <input class="input" id="hddt-username" data-keep="1" type="text" autocomplete="off" spellcheck="false" placeholder="Nhập tài khoản hóa đơn điện tử" aria-invalid="${f.errorField === 'hddt-username' ? 'true' : 'false'}" ${dis}>
+            <label class="field-label" for="hddt-username">${copy.userLabel}</label>
+            <input class="input" id="hddt-username" data-keep="1" type="text" autocomplete="off" spellcheck="false" placeholder="${copy.userPlaceholder}" aria-invalid="${f.errorField === 'hddt-username' ? 'true' : 'false'}" ${dis}>
           </div>
           <div class="field">
             <label class="field-label" for="hddt-password">Mật khẩu</label>
@@ -1994,9 +2011,22 @@
     step2: 'Hệ thống lấy hóa đơn đầu vào',
     step3: 'Chọn hóa đơn để tài trợ'
   });
+  // Tài trợ lương: đăng nhập bằng MST để dùng sản phẩm lương, không lấy hóa đơn.
   gateWithHddt(pf, 'Tài trợ lương', {
-    lead: 'Kết nối một lần, hệ thống tự lấy hóa đơn đầu ra và đầu vào từ cổng hóa đơn điện tử. Quý khách không cần gửi hóa đơn qua email.',
-    step2: 'Hệ thống lấy hóa đơn đầu ra và đầu vào',
-    step3: 'Tạo yêu cầu chi lương'
+    eyebrow: 'Tài trợ lương',
+    heading: 'Đăng nhập để sử dụng Tài trợ lương',
+    lead: 'Đăng nhập bằng mã số thuế của doanh nghiệp để tạo yêu cầu chi lương.',
+    step1: 'Đăng nhập bằng mã số thuế',
+    step2: 'Tải lên bảng lương',
+    step3: 'Gửi yêu cầu chi lương',
+    formTitle: 'Đăng nhập',
+    userLabel: 'Mã số thuế',
+    userPlaceholder: 'Nhập mã số thuế',
+    busy: 'Đang đăng nhập…',
+    done: 'Đã đăng nhập. Đang tải…'
+  }, {
+    get: function () { return api.getPfAccess(); },
+    open: function (a) { return a.loggedIn; },
+    connect: function (username, password) { return api.loginPf(username, password); }
   });
 })();
