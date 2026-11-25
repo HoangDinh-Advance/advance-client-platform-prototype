@@ -1892,7 +1892,7 @@
   };
   // Tài khoản là MST của doanh nghiệp đang đăng nhập (hiện sẵn, không sửa); khách chỉ nhập mật khẩu.
   var HDDT_COPY = {
-    eyebrow: 'Hóa đơn điện tử', heading: 'Kết nối tài khoản hóa đơn điện tử', step1: 'Đăng nhập tài khoản hóa đơn điện tử (hoadondientu.gdt.gov.vn)',
+    eyebrow: 'Hóa đơn điện tử', heading: 'Kết nối tài khoản hóa đơn điện tử', step1: 'Đăng nhập tài khoản hóa đơn điện tử hoadondientu.gdt.gov.vn',
     formTitle: 'Đăng nhập HĐĐT', userLabel: 'Tài khoản (mã số thuế)',
     passwordLabel: 'Mật khẩu', passwordPlaceholder: 'Nhập mật khẩu',
     passwordNote: true, noteFocus: 'sử dụng sản phẩm của Advance', passwordRequired: 'Quý khách hàng vui lòng nhập mật khẩu.',
@@ -2023,7 +2023,7 @@
     eyebrow: 'Tài trợ lương',
     heading: 'Đăng nhập để sử dụng Tài trợ lương',
     lead: 'Quý khách hàng vui lòng đăng nhập để tạo yêu cầu chi lương cùng Advance. Chỉ cần đăng nhập một lần.',
-    step1: 'Đăng nhập tài khoản hóa đơn điện tử (hoadondientu.gdt.gov.vn)',
+    step1: 'Đăng nhập tài khoản hóa đơn điện tử hoadondientu.gdt.gov.vn',
     step2: 'Tải lên bảng lương',
     step3: 'Gửi yêu cầu chi lương',
     formTitle: 'Đăng nhập',
